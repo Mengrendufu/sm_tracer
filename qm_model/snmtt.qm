@@ -1,0 +1,747 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<model version="5.2.3" links="0">
+ <framework name="qpc"/>
+ <package name="AOs" stereotype="0x00">
+  <class name="Blinky" superclass="qpc::QActive">
+   <attribute name="timeEvt" type="QTimeEvt" visibility="0x00" properties="0x00"/>
+   <statechart properties="0x00">
+    <initial target="../1">
+     <action>Q_UNUSED_PAR(par); // initialization parameter unused in this case
+// arm the time event to expire in half a second and every half second
+QTimeEvt_armX(
+    &amp;me-&gt;timeEvt,
+    BSP_TICKS_PER_SEC/2U, BSP_TICKS_PER_SEC/2U);</action>
+     <initial_glyph conn="10,6,5,0,-2,4">
+      <action box="0,-2,10,2"/>
+     </initial_glyph>
+    </initial>
+    <state name="on">
+     <entry>BSP_ledOn();</entry>
+     <tran trig="TIMEOUT" target="../../2">
+      <tran_glyph conn="4,18,3,1,22,6,-2">
+       <action box="0,-2,10,2"/>
+      </tran_glyph>
+     </tran>
+     <state_glyph node="4,10,20,10">
+      <entry box="1,2,6,2"/>
+     </state_glyph>
+    </state>
+    <state name="off">
+     <entry>BSP_ledOff();</entry>
+     <tran trig="TIMEOUT" target="../../1">
+      <tran_glyph conn="4,30,3,1,24,-18,-4">
+       <action box="0,-2,10,2"/>
+      </tran_glyph>
+     </tran>
+     <state_glyph node="4,22,20,10">
+      <entry box="1,2,6,2"/>
+     </state_glyph>
+    </state>
+    <state_diagram size="32,36"/>
+   </statechart>
+  </class>
+  <class name="GuiMngr" superclass="qpc::QActive">
+   <attribute name="timeEvt" type="QTimeEvt" visibility="0x00" properties="0x00"/>
+   <statechart properties="0x00">
+    <initial target="../1">
+     <action>Q_UNUSED_PAR(par); // initialization parameter unused in this case</action>
+     <initial_glyph conn="10,6,5,0,-2,4">
+      <action box="0,-2,10,2"/>
+     </initial_glyph>
+    </initial>
+    <state name="active">
+     <initial target="../16">
+      <initial_glyph conn="12,58,5,0,-2,2">
+       <action box="0,-2,10,2"/>
+      </initial_glyph>
+     </initial>
+     <tran trig="GUI_CLICK_REFRESH_BUTTON">
+      <action>QEvt *evt = Q_NEW(QEvt, SP_MNGR_REFRESH_SERIAL_PORT_SIG);
+QACTIVE_POST(AO_SpMngr, (QEvt *)evt, (void *)0);</action>
+      <tran_glyph conn="4,18,3,-1,26">
+       <action box="0,-2,26,2"/>
+      </tran_glyph>
+     </tran>
+     <tran trig="GUI_UPDATE_COM">
+      <action>SpMngrEvt *evt = Q_NEW(SpMngrEvt, SP_MNGR_UPDATE_COM_SELECTION_SIG);
+evt-&gt;pld.txt = ((GuiMngrEvt *)e)-&gt;txt;
+QACTIVE_POST(AO_SpMngr, (QEvt*)evt, (void *)0);</action>
+      <tran_glyph conn="4,22,3,-1,20">
+       <action box="0,-2,18,2"/>
+      </tran_glyph>
+     </tran>
+     <tran trig="GUI_UPDATE_BAUDRATE">
+      <action>SpMngrEvt *evt = Q_NEW(SpMngrEvt, SP_MNGR_UPDATE_BAUDRATE_SIG);
+evt-&gt;pld.txt = ((GuiMngrEvt *)e)-&gt;txt;
+QACTIVE_POST(AO_SpMngr, (QEvt*)evt, (void *)0);</action>
+      <tran_glyph conn="4,24,3,-1,20">
+       <action box="0,-2,20,2"/>
+      </tran_glyph>
+     </tran>
+     <tran trig="GUI_UPDATE_DATABITS">
+      <action>SpMngrEvt *evt = Q_NEW(SpMngrEvt, SP_MNGR_UPDATE_DATABITS_SIG);
+evt-&gt;pld.txt = ((GuiMngrEvt *)e)-&gt;txt;
+QACTIVE_POST(AO_SpMngr, (QEvt*)evt, (void *)0);</action>
+      <tran_glyph conn="4,26,3,-1,20">
+       <action box="0,-2,20,2"/>
+      </tran_glyph>
+     </tran>
+     <tran trig="GUI_UPDATE_STOPBITS">
+      <action>SpMngrEvt *evt = Q_NEW(SpMngrEvt, SP_MNGR_UPDATE_STOPBITS_SIG);
+evt-&gt;pld.txt = ((GuiMngrEvt *)e)-&gt;txt;
+QACTIVE_POST(AO_SpMngr, (QEvt*)evt, (void *)0);</action>
+      <tran_glyph conn="4,28,3,-1,20">
+       <action box="0,-2,20,2"/>
+      </tran_glyph>
+     </tran>
+     <tran trig="GUI_UPDATE_PARITY">
+      <action>SpMngrEvt *evt = Q_NEW(SpMngrEvt, SP_MNGR_UPDATE_PARITY_SIG);
+evt-&gt;pld.txt = ((GuiMngrEvt *)e)-&gt;txt;
+QACTIVE_POST(AO_SpMngr, (QEvt*)evt, (void *)0);</action>
+      <tran_glyph conn="4,30,3,-1,24">
+       <action box="0,-2,20,2"/>
+      </tran_glyph>
+     </tran>
+     <tran trig="GUI_UPDATE_FLOWCONTROL">
+      <action>SpMngrEvt *evt = Q_NEW(SpMngrEvt, SP_MNGR_UPDATE_FLOWCONTROL_SIG);
+evt-&gt;pld.txt = ((GuiMngrEvt *)e)-&gt;txt;
+QACTIVE_POST(AO_SpMngr, (QEvt*)evt, (void *)0);</action>
+      <tran_glyph conn="4,32,3,-1,24">
+       <action box="0,-2,24,2"/>
+      </tran_glyph>
+     </tran>
+     <tran trig="GUI_GET_UPDATED_COM_INFO">
+      <action>SDL_Event event;
+SDL_zero(event);
+event.type = DISP_UPDATE_COM_DROPDOWN_BOX_INFO_SIG;
+event.user.data1 = (void *)((((GuiMngrEvt *)e)-&gt;txt));
+SDL_PushEvent(&amp;event);  /* thread-safe push */</action>
+      <tran_glyph conn="4,36,3,-1,26">
+       <action box="0,-2,26,2"/>
+      </tran_glyph>
+     </tran>
+     <tran trig="GUI_OPEN_INVALID_COM" target="..">
+      <tran_glyph conn="4,40,3,1,40">
+       <action box="0,-2,20,2"/>
+      </tran_glyph>
+     </tran>
+     <tran trig="GUI_MNGR_PORT_ERR_SHUT_DOWN" target="..">
+      <tran_glyph conn="4,42,3,1,40">
+       <action box="0,-2,30,2"/>
+      </tran_glyph>
+     </tran>
+     <tran trig="GUI_MNGR_UPDATE_SELECTED_JSON_FILE">
+      <action>SpMngrEvt *evt = Q_NEW(SpMngrEvt, SP_MNGR_UPDATE_SELECTED_JSON_FILE_SIG);
+evt-&gt;pld.txt = ((GuiMngrEvt *)e)-&gt;txt;
+QACTIVE_POST(AO_SpMngr, (QEvt*)evt, (void *)0);</action>
+      <tran_glyph conn="4,46,3,-1,34">
+       <action box="0,-2,34,2"/>
+      </tran_glyph>
+     </tran>
+     <tran trig="GUI_MNGR_LOAD_SELECTED_JSON_FILE">
+      <action>SpMngrEvt *evt = Q_NEW(SpMngrEvt, SP_MNGR_LOAD_SELECTED_JSON_FILE_SIG);
+QACTIVE_POST(AO_SpMngr, (QEvt*)evt, (void *)0);</action>
+      <tran_glyph conn="4,48,3,-1,34">
+       <action box="0,-2,33,2"/>
+      </tran_glyph>
+     </tran>
+     <tran trig="GUI_MNGR_RECV_MSG">
+      <action>/* Send the *txt to Display */
+SDL_Event event;
+SDL_zero(event);
+event.type = DISP_UPDATE_RECV_BOX_MSG_SIG;
+event.user.data1 = (void *)((((GuiMngrEvt *)e)-&gt;txt));
+SDL_PushEvent(&amp;event);  /* thread-safe push */</action>
+      <tran_glyph conn="4,54,3,-1,20">
+       <action box="0,-2,19,2"/>
+      </tran_glyph>
+     </tran>
+     <tran trig="GUI_MNGR_UPDATE_LOADED_JSON_FILE">
+      <action>SDL_Event event;
+SDL_zero(event);
+event.type = DISP_UPDATE_LOADED_JSON_FILE_SIG;
+event.user.data1 = (void *)((((GuiMngrEvt *)e)-&gt;txt));
+SDL_PushEvent(&amp;event);  /* thread-safe push */</action>
+      <tran_glyph conn="4,50,3,-1,34">
+       <action box="0,-2,33,2"/>
+      </tran_glyph>
+     </tran>
+     <state name="opened">
+      <entry>SDL_Event event;
+SDL_zero(event);
+event.type = DISP_UPDATE_OPEN_STATE_SIG;
+SDL_PushEvent(&amp;event);  /* thread-safe push */</entry>
+      <tran trig="GUI_CLICK_OPEN_CLOSE_BUTTON" target="../../18">
+       <action>/* Close port */
+SpMngrEvt *evt = Q_NEW(SpMngrEvt, SP_MNGR_CLOSE_SERIAL_PORT_SIG);
+QACTIVE_POST(AO_SpMngr, (QEvt *)evt, (void *)0);</action>
+       <tran_glyph conn="6,94,3,1,36,6,-2">
+        <action box="0,-2,28,2"/>
+       </tran_glyph>
+      </tran>
+      <state_glyph node="6,86,34,10">
+       <entry box="1,2,6,2"/>
+      </state_glyph>
+     </state>
+     <state name="closed">
+      <entry>SDL_Event event;
+SDL_zero(event);
+event.type = DISP_UPDATE_CLOSE_STATE_SIG;
+SDL_PushEvent(&amp;event);  /* thread-safe push */</entry>
+      <tran trig="GUI_CLICK_OPEN_CLOSE_BUTTON" target="../../17">
+       <action>SpMngrEvt *evt = Q_NEW(SpMngrEvt, SP_MNGR_OPEN_SERIAL_PORT_SIG);
+QACTIVE_POST(AO_SpMngr, (QEvt *)evt, (void *)0);</action>
+       <tran_glyph conn="6,68,3,1,36,6,-2">
+        <action box="0,-2,28,2"/>
+       </tran_glyph>
+      </tran>
+      <state_glyph node="6,60,34,10">
+       <entry box="1,2,6,2"/>
+      </state_glyph>
+     </state>
+     <state name="opening">
+      <entry>SDL_Event event;
+SDL_zero(event);
+event.type = DISP_UPDATE_OPENING_STATE_SIG;
+SDL_PushEvent(&amp;event);  /* thread-safe push */</entry>
+      <tran trig="GUI_OPEN_COM_SUCCESS" target="../../15">
+       <tran_glyph conn="6,82,3,1,36,6,-2">
+        <action box="0,-2,22,2"/>
+       </tran_glyph>
+      </tran>
+      <tran trig="GUI_OPEN_COM_FAIL" target="../..">
+       <tran_glyph conn="6,80,3,1,38">
+        <action box="0,-2,18,2"/>
+       </tran_glyph>
+      </tran>
+      <state_glyph node="6,72,34,12">
+       <entry box="1,2,6,2"/>
+      </state_glyph>
+     </state>
+     <state name="closing">
+      <entry>SDL_Event event;
+SDL_zero(event);
+event.type = DISP_UPDATE_CLOSING_STATE_SIG;
+SDL_PushEvent(&amp;event);  /* thread-safe push */</entry>
+      <tran trig="GUI_MNGR_CLOSE_COM_SUCCESS" target="../..">
+       <tran_glyph conn="6,106,3,1,38">
+        <action box="0,-2,28,2"/>
+       </tran_glyph>
+      </tran>
+      <state_glyph node="6,98,34,10">
+       <entry box="1,2,6,2"/>
+      </state_glyph>
+     </state>
+     <state_glyph node="4,10,40,100"/>
+    </state>
+    <state_diagram size="48,112"/>
+   </statechart>
+  </class>
+  <class name="SpMngr" superclass="qpc::QActive">
+   <attribute name="timeEvt" type="QTimeEvt" visibility="0x00" properties="0x00"/>
+   <attribute name="com[64]" type="char" visibility="0x00" properties="0x00"/>
+   <attribute name="baudrate" type="int" visibility="0x00" properties="0x00"/>
+   <attribute name="dataBits" type="int" visibility="0x00" properties="0x00"/>
+   <attribute name="stopBits" type="SerialStopBits_t" visibility="0x00" properties="0x00"/>
+   <attribute name="parity" type="SerialParity_t" visibility="0x00" properties="0x00"/>
+   <attribute name="flowControl" type="SerialFlow_t" visibility="0x00" properties="0x00"/>
+   <attribute name="currJsonFile" type="char *" visibility="0x00" properties="0x00"/>
+   <statechart properties="0x00">
+    <initial target="../1">
+     <action>Q_UNUSED_PAR(par); // initialization parameter unused in this case</action>
+     <initial_glyph conn="10,6,5,0,-2,4">
+      <action box="0,-2,10,2"/>
+     </initial_glyph>
+    </initial>
+    <state name="active">
+     <tran trig="SP_MNGR_REFRESH_SERIAL_PORT">
+      <action>BSP_Post2LspThread(
+    SP_TRD_UPDATE_SERIAL_PORTS_SIG,
+    (char *)0,
+    115200,
+    8,
+    SP_STOPBITS_1_OP,
+    SP_PARITY_NONE_OP,
+    SP_FLOW_NONE_OP);</action>
+      <tran_glyph conn="4,18,3,-1,30">
+       <action box="0,-2,30,2"/>
+      </tran_glyph>
+     </tran>
+     <tran trig="SP_MNGR_UPDATE_DATABITS">
+      <action>/* update */
+me-&gt;dataBits = str_to_databits(((SpMngrEvt *)e)-&gt;pld.txt);
+free(((SpMngrEvt *)e)-&gt;pld.txt);</action>
+      <tran_glyph conn="4,30,3,-1,24">
+       <action box="0,-2,24,2"/>
+      </tran_glyph>
+     </tran>
+     <tran trig="SP_MNGR_GET_UPDATED_COM_INFO">
+      <action>GuiMngrEvt *evt = Q_NEW(GuiMngrEvt, GUI_GET_UPDATED_COM_INFO_SIG);
+evt-&gt;txt = ((SpMngrEvt *)e)-&gt;pld.portLst;
+QACTIVE_POST(AO_GuiMngr, (QEvt *)evt, (void *)0);</action>
+      <tran_glyph conn="4,22,3,-1,30">
+       <action box="0,-2,30,2"/>
+      </tran_glyph>
+     </tran>
+     <tran trig="SP_MNGR_UPDATE_COM_SELECTION">
+      <action>/* update */
+strcpy(me-&gt;com, ((SpMngrEvt *)e)-&gt;pld.txt);
+free(((SpMngrEvt *)e)-&gt;pld.txt);</action>
+      <tran_glyph conn="4,26,3,-1,30">
+       <action box="0,-2,30,2"/>
+      </tran_glyph>
+     </tran>
+     <tran trig="SP_MNGR_UPDATE_BAUDRATE">
+      <action>/* update */
+me-&gt;baudrate = str_to_baud(((SpMngrEvt *)e)-&gt;pld.txt);
+free(((SpMngrEvt *)e)-&gt;pld.txt);</action>
+      <tran_glyph conn="4,28,3,-1,24">
+       <action box="0,-2,24,2"/>
+      </tran_glyph>
+     </tran>
+     <tran trig="SP_MNGR_UPDATE_STOPBITS">
+      <action>/* update */
+me-&gt;stopBits = str_to_stopbits(((SpMngrEvt *)e)-&gt;pld.txt);
+free(((SpMngrEvt *)e)-&gt;pld.txt);</action>
+      <tran_glyph conn="4,32,3,-1,24">
+       <action box="0,-2,24,2"/>
+      </tran_glyph>
+     </tran>
+     <tran trig="SP_MNGR_UPDATE_PARITY">
+      <action>/* update */
+me-&gt;parity = str_to_parity(((SpMngrEvt *)e)-&gt;pld.txt);
+free(((SpMngrEvt *)e)-&gt;pld.txt);</action>
+      <tran_glyph conn="4,34,3,-1,24">
+       <action box="0,-2,24,2"/>
+      </tran_glyph>
+     </tran>
+     <tran trig="SP_MNGR_UPDATE_FLOWCONTROL">
+      <action>/* update */
+me-&gt;flowControl = str_to_flowcontrol(((SpMngrEvt *)e)-&gt;pld.txt);
+free(((SpMngrEvt *)e)-&gt;pld.txt);</action>
+      <tran_glyph conn="4,36,3,-1,28">
+       <action box="0,-2,28,2"/>
+      </tran_glyph>
+     </tran>
+     <tran trig="SP_MNGR_OPEN_SERIAL_PORT">
+      <choice target="../../13">
+       <guard>SpMngr_comNameIsInvalid(me-&gt;com)</guard>
+       <action>BSP_Post2LspThread(
+    SP_TRD_OPEN_PORT_SIG,
+    me-&gt;com,
+    me-&gt;baudrate,
+    me-&gt;dataBits,
+    me-&gt;stopBits,
+    me-&gt;parity,
+    me-&gt;flowControl);</action>
+       <choice_glyph conn="30,40,4,1,2,10,18,-2">
+        <action box="1,2,11,2"/>
+       </choice_glyph>
+      </choice>
+      <choice>
+       <guard>else</guard>
+       <action>GuiMngrEvt *evt = Q_NEW(GuiMngrEvt, GUI_OPEN_INVALID_COM_SIG);
+QACTIVE_POST(AO_GuiMngr, (QEvt*)evt, (void *)0);</action>
+       <choice_glyph conn="30,40,5,-1,10">
+        <action box="1,0,10,2"/>
+       </choice_glyph>
+      </choice>
+      <tran_glyph conn="4,40,3,-1,26">
+       <action box="0,-2,26,2"/>
+      </tran_glyph>
+     </tran>
+     <tran trig="SP_MNGR_RECV_PACKET">
+      <action brief="JustInCase">/* In case of memory leaking. */
+free(((SpMngrEvt *)e)-&gt;pld.packBuf);</action>
+      <tran_glyph conn="4,46,3,-1,22">
+       <action box="0,-2,21,2"/>
+      </tran_glyph>
+     </tran>
+     <tran trig="SP_MNGR_UPDATE_SELECTED_JSON_FILE">
+      <action>if (me-&gt;currJsonFile) free(me-&gt;currJsonFile);
+me-&gt;currJsonFile = ((SpMngrEvt *)e)-&gt;pld.txt;</action>
+      <tran_glyph conn="4,52,3,-1,34">
+       <action box="0,-2,33,2"/>
+      </tran_glyph>
+     </tran>
+     <tran trig="SP_MNGR_LOAD_SELECTED_JSON_FILE">
+      <action>/* Load the target json file to local */
+SNMTT_loadJSONConfig(me-&gt;currJsonFile);
+
+/* Update loaded json file to Display... */
+GuiMngrEvt *evt = Q_NEW(GuiMngrEvt, GUI_MNGR_UPDATE_LOADED_JSON_FILE_SIG);
+evt-&gt;txt = strdup(me-&gt;currJsonFile);
+QACTIVE_POST(AO_GuiMngr, (QEvt*)evt, (void *)0);</action>
+      <tran_glyph conn="4,54,3,-1,34">
+       <action box="0,-2,33,2"/>
+      </tran_glyph>
+     </tran>
+     <tran trig="SP_MNGR_RECV_MSG">
+      <action>/* Unpackage [Seq.] [RecID] [pldLen] [payload...]... */
+uint8_t *currMsg = ((SpMngrEvt *)e)-&gt;pld.msgFrm;
+SNMTT_PayloadParser *recIdParser = SNMTT_RX_getRecID(currMsg[1]);
+if (recIdParser != NULL) {  /* Valid RecID. */
+    uint8_t pldSize = currMsg[2];
+    uint8_t pldSizeIter = pldSize;
+    uint8_t *pldStart = currMsg + 3;
+    uint16_t msgSize = strlen(recIdParser-&gt;format) + 1; /* '\0'. */
+    msgSize += 6;  /* &quot;[%03d]&quot; &quot;... ...&quot; */
+    char *nFmt = malloc(msgSize);
+    Q_ENSURE(nFmt != NULL);
+    /* Format update. */
+    snprintf(nFmt, msgSize,
+            &quot;[%%03d]%s&quot;, recIdParser-&gt;format);
+    msgSize = strlen(nFmt);
+    char *fmtArgv[SNMTT_ARGS_NUM_MAX] = {
+        NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+        NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL
+    };
+    for (
+        int i = 0;
+        (i &lt; SNMTT_ARGS_NUM_MAX) &amp;&amp; (pldSizeIter &gt; 0);
+        ++i
+    ) {
+        /* Valid parser arg... */
+        if (recIdParser-&gt;args[i]) {
+            if (
+                recIdParser-&gt;args[i]-&gt;radix == SNMTT_RADIX_STRING
+            ) {
+                /* String of module... */
+                /* Collecting all the rest payload... */
+                char *moduleStr = malloc(pldSizeIter + 1);
+                Q_ENSURE(moduleStr != (char *)0);
+                memcpy(
+                    moduleStr, pldStart + (pldSize - pldSizeIter),
+                    pldSizeIter);
+                moduleStr[pldSizeIter] = '\0';
+                fmtArgv[i] = moduleStr; /* To dispMsg. */
+                msgSize += strlen(fmtArgv[i]);
+                pldSizeIter = 0; /* Break loop. */
+            } else if (
+                recIdParser-&gt;args[i]-&gt;argLen &lt;= pldSizeIter
+            ) {
+                /* Normal parsing... */
+                fmtArgv[i] =
+                    SNMTT_itoa(
+                        pldStart + (pldSize - pldSizeIter),
+                        recIdParser-&gt;args[i]-&gt;argLen,
+                        recIdParser-&gt;args[i]-&gt;radix);
+                msgSize += strlen(fmtArgv[i]);
+                pldSizeIter -= recIdParser-&gt;args[i]-&gt;argLen;
+            }
+        }
+    }
+    char *dispMsg = malloc(msgSize);
+    Q_ENSURE(dispMsg != NULL);
+    snprintf(dispMsg, msgSize, nFmt, currMsg[0],
+            fmtArgv[0],  fmtArgv[1],  fmtArgv[2],  fmtArgv[3],
+            fmtArgv[4],  fmtArgv[5],  fmtArgv[6],  fmtArgv[7],
+            fmtArgv[8],  fmtArgv[9],  fmtArgv[10], fmtArgv[11],
+            fmtArgv[12], fmtArgv[13], fmtArgv[14], fmtArgv[15]);
+    free(nFmt);
+    /* Free memory generated from *SNMTT_itoa. */
+    for (int i = 0; i &lt; SNMTT_ARGS_NUM_MAX; ++i) {
+        if (fmtArgv[i]) free(fmtArgv[i]);
+    }
+    /* Send disMsg to Display. */
+    GuiMngrEvt *evt = Q_NEW(GuiMngrEvt, GUI_MNGR_RECV_MSG_SIG);
+    evt-&gt;txt = dispMsg;
+    QACTIVE_POST(AO_GuiMngr, (QEvt*)evt, (void *)0);
+} else {  /* Invalid RecID. */
+    /* Send [Seq.][RecID][pldLen] frame to Display. */
+    uint8_t dispMsgLen = 22 + 1;
+    char *dispMsg = malloc(dispMsgLen);
+    Q_ENSURE(dispMsg != (char *)0);
+    snprintf(
+        dispMsg, dispMsgLen, &quot;[%03d][%03d][%03d][????]\n&quot;,
+        currMsg[0], currMsg[1], currMsg[2]);
+    GuiMngrEvt *evt = Q_NEW(GuiMngrEvt, GUI_MNGR_RECV_MSG_SIG);
+    evt-&gt;txt = dispMsg;
+    QACTIVE_POST(AO_GuiMngr, (QEvt*)evt, (void *)0);
+}
+free(((SpMngrEvt *)e)-&gt;pld.msgFrm); /*! GC. */</action>
+      <tran_glyph conn="4,48,3,-1,22">
+       <action box="0,-2,21,2"/>
+      </tran_glyph>
+     </tran>
+     <state name="opening">
+      <tran trig="SP_MNGR_OPEN_COM_SUCCESS" target="../../14">
+       <action>GuiMngrEvt *evt = Q_NEW(GuiMngrEvt, GUI_OPEN_COM_SUCCESS_SIG);
+QACTIVE_POST(AO_GuiMngr, (QEvt *)evt, (void *)0);</action>
+       <tran_glyph conn="6,68,3,1,34,8,-2">
+        <action box="0,-2,29,2"/>
+       </tran_glyph>
+      </tran>
+      <tran trig="SP_MNGR_OPEN_COM_FAIL" target="../..">
+       <action>GuiMngrEvt *evt = Q_NEW(GuiMngrEvt, GUI_OPEN_COM_FAIL_SIG);
+QACTIVE_POST(AO_GuiMngr, (QEvt *)evt, (void *)0);</action>
+       <tran_glyph conn="6,66,3,1,36">
+        <action box="0,-2,25,2"/>
+       </tran_glyph>
+      </tran>
+      <state_glyph node="6,58,32,12"/>
+     </state>
+     <state name="opened">
+      <tran trig="SP_MNGR_CLOSE_COM_SUCCESS" target="../..">
+       <action>GuiMngrEvt *evt = Q_NEW(GuiMngrEvt, GUI_MNGR_CLOSE_COM_SUCCESS_SIG);
+QACTIVE_POST(AO_GuiMngr, (QEvt *)evt, (void *)0);</action>
+       <tran_glyph conn="6,84,3,1,36">
+        <action box="0,-2,28,2"/>
+       </tran_glyph>
+      </tran>
+      <tran trig="SP_MNGR_PORT_ERR_SHUT_DOWN" target="../..">
+       <action>GuiMngrEvt *evt = Q_NEW(GuiMngrEvt, GUI_MNGR_PORT_ERR_SHUT_DOWN_SIG);
+QACTIVE_POST(AO_GuiMngr, (QEvt *)evt, (void *)0);</action>
+       <tran_glyph conn="6,86,3,1,36">
+        <action box="0,-2,30,2"/>
+       </tran_glyph>
+      </tran>
+      <tran trig="SP_MNGR_CLOSE_SERIAL_PORT">
+       <action>/* Close port. */
+BSP_Post2LspThread(
+    SP_TRD_CLOSE_PORT_SIG,
+    (char *)0, 0, 0, 0, 0, 0);</action>
+       <tran_glyph conn="6,82,3,-1,28">
+        <action box="0,-2,28,2"/>
+       </tran_glyph>
+      </tran>
+      <tran trig="SP_MNGR_RECV_PACKET">
+       <action>/**
+ * Parse the received byte package based on current protocal
+ * and generate the frame to Display...
+ */
+for (int i = 0; i &lt; ((SpMngrEvt *)e)-&gt;pldSize.packSize; ++i) {
+    HLDCParser_trigger(((SpMngrEvt *)e)-&gt;pld.packBuf[i]);
+}
+free(((SpMngrEvt *)e)-&gt;pld.packBuf);  /*! GC. */</action>
+       <tran_glyph conn="6,90,3,-1,22">
+        <action box="0,-2,22,2"/>
+       </tran_glyph>
+      </tran>
+      <state_glyph node="6,74,32,18"/>
+     </state>
+     <state_glyph node="4,10,38,84"/>
+    </state>
+    <state_diagram size="46,96"/>
+   </statechart>
+  </class>
+ </package>
+ <directory name="../application">
+  <file name="blinky.h" codec="UTF-8">
+   <text>/*==========================================================================*/
+#ifndef BLINKY_H_
+#define BLINKY_H_
+
+/*==========================================================================*/
+extern QActive * const AO_Blinky; /* Global opaque pointer. */
+
+/*==========================================================================*/
+void Blinky_ctor(void);
+
+#endif  /* BLINKY_H_ */</text>
+  </file>
+  <file name="blinky.c" codec="UTF-8">
+   <text>/*==========================================================================*/
+#include &quot;qpc.h&quot;
+#include &quot;bsp.h&quot;
+#include &quot;application.h&quot;
+
+/*==========================================================================*/
+/* ===Blinky Active Object (AO) class. */
+$declare ${AOs::Blinky}
+
+/*==========================================================================*/
+/* ===AO instance. */
+static Blinky Blinky_inst;
+QActive * const AO_Blinky = &amp;Blinky_inst.super;
+
+/*==========================================================================*/
+void Blinky_ctor(void) {
+    /* 'me' points to the Blinky instance. */
+    Blinky * const me = &amp;Blinky_inst;
+
+    /* call the superclass' constructor. */
+    QActive_ctor(&amp;me-&gt;super, Q_STATE_CAST(&amp;Blinky_initial));
+
+    /* call the members' constructors. */
+    QTimeEvt_ctorX(&amp;me-&gt;timeEvt, &amp;me-&gt;super, TIMEOUT_SIG, 0U);
+}
+
+/*..........................................................................*/
+/* ...State machine. */
+$define ${AOs::Blinky}</text>
+  </file>
+  <file name="gui_mngr.h" codec="UTF-8">
+   <text>/*==========================================================================*/
+#ifndef GUI_MNGR_H_
+#define GUI_MNGR_H_
+
+/*==========================================================================*/
+extern QActive * const AO_GuiMngr; /* Global opaque pointer. */
+
+/*==========================================================================*/
+void GuiMngr_ctor(void);
+
+#endif  /* GUI_MNGR_H_ */</text>
+  </file>
+  <file name="gui_mngr.c" codec="UTF-8">
+   <text>/*==========================================================================*/
+#include &quot;qpc.h&quot;
+#include &quot;bsp.h&quot;
+#include &quot;application.h&quot;
+
+/*==========================================================================*/
+/* ===GuiMngr Active Object (AO) class. */
+$declare ${AOs::GuiMngr}
+
+/*==========================================================================*/
+/* ===AO instance. */
+static GuiMngr GuiMngr_inst;
+QActive * const AO_GuiMngr = &amp;GuiMngr_inst.super;
+
+/*==========================================================================*/
+void GuiMngr_ctor(void) {
+    /* 'me' points to the Blinky instance. */
+    GuiMngr * const me = &amp;GuiMngr_inst;
+
+    /* call the superclass' constructor. */
+    QActive_ctor(&amp;me-&gt;super, Q_STATE_CAST(&amp;GuiMngr_initial));
+
+    /* call the members' constructors. */
+    QTimeEvt_ctorX(&amp;me-&gt;timeEvt, &amp;me-&gt;super, TIMEOUT_SIG, 0U);
+}
+
+/*..........................................................................*/
+/* ...State machine. */
+$define ${AOs::GuiMngr}</text>
+  </file>
+  <file name="sp_mngr.h" codec="UTF-8">
+   <text>/*==========================================================================*/
+#ifndef SP_MNGR_H_
+#define SP_MNGR_H_
+
+/*==========================================================================*/
+extern QActive * const AO_SpMngr; /* Global opaque pointer. */
+
+/*==========================================================================*/
+void SpMngr_ctor(void);
+
+/*==========================================================================*/
+/* ===lspThread events. */
+#include &quot;spthread_evt.h&quot;
+
+/*==========================================================================*/
+/* ===Json file parser. */
+#include &quot;snmtt_json_parser.h&quot;
+
+/*==========================================================================*/
+/* ===HLDC bytes parser. */
+#include &quot;snmtt_hldc_parser.h&quot;
+
+#endif  /* SP_MNGR_H_ */</text>
+  </file>
+  <file name="sp_mngr.c" codec="UTF-8">
+   <text>/*==========================================================================*/
+#include &quot;qpc.h&quot;
+#include &quot;bsp.h&quot;
+#include &quot;application.h&quot;
+
+/*==========================================================================*/
+Q_DEFINE_THIS_MODULE(&quot;sp_mngr&quot;)
+
+/*==========================================================================*/
+/* ===SpMngr Active Object (AO) class. */
+$declare ${AOs::SpMngr}
+
+/*==========================================================================*/
+/* ===AO instance. */
+SpMngr SpMngr_inst;
+QActive * const AO_SpMngr = &amp;SpMngr_inst.super;
+
+/*==========================================================================*/
+void SpMngr_ctor(void) {
+    /* 'me' points to the Blinky instance. */
+    SpMngr * const me = &amp;SpMngr_inst;
+
+    /* call the superclass' constructor. */
+    QActive_ctor(&amp;me-&gt;super, Q_STATE_CAST(&amp;SpMngr_initial));
+
+    /* call the members' constructors. */
+    QTimeEvt_ctorX(&amp;me-&gt;timeEvt, &amp;me-&gt;super, TIMEOUT_SIG, 0U);
+
+    /* default constructor... */
+    me-&gt;com[0] = 'N'; me-&gt;com[1] = 'U'; me-&gt;com[2] = 'L'; me-&gt;com[3] = 'L';
+    me-&gt;com[4] = '\0';
+
+    me-&gt;baudrate    = 115200;
+    me-&gt;dataBits    = 8;
+    me-&gt;stopBits    = SP_STOPBITS_1_OP;
+    me-&gt;parity      = SP_PARITY_NONE_OP;
+    me-&gt;flowControl = SP_FLOW_NONE_OP;
+
+    /* Default !NULL, for GC operation. */
+    me-&gt;currJsonFile = strdup(&quot;Empty&quot;);
+
+    HLDCPaser_ctor();
+}
+
+/*==========================================================================*/
+/* ...String -&gt; Int */
+int str_to_baud(const char *str) {
+    if (!str) return 115200; /* Default. */
+    return atoi(str);
+}
+/*..........................................................................*/
+/* ...String -&gt; Int. */
+int str_to_databits(const char *str) {
+    if (!str) return 8;
+    return atoi(str); // &quot;8&quot; -&gt; 8, &quot;5&quot; -&gt; 5
+}
+/*..........................................................................*/
+/* ...String -&gt; Enum. */
+SerialStopBits_t str_to_stopbits(const char *str) {
+    if (!str) return SP_STOPBITS_1_OP;
+    if (strcmp(str, &quot;1.5&quot;) == 0) {
+        return SP_STOPBITS_1_5_OP;
+    } else if (strcmp(str, &quot;2&quot;) == 0) {
+        return SP_STOPBITS_2_OP;
+    } else {
+        return SP_STOPBITS_1_OP;
+    }
+}
+/*..........................................................................*/
+/* ...String -&gt; Enum. */
+SerialParity_t str_to_parity(const char *str) {
+    if (!str) return SP_PARITY_NONE_OP;
+    if (strcmp(str, &quot;Odd&quot;) == 0)        return SP_PARITY_ODD_OP;
+    else if (strcmp(str, &quot;Even&quot;) == 0)  return SP_PARITY_EVEN_OP;
+    else if (strcmp(str, &quot;Mark&quot;) == 0)  return SP_PARITY_MARK_OP;
+    else if (strcmp(str, &quot;Space&quot;) == 0) return SP_PARITY_SPACE_OP;
+    return SP_PARITY_NONE_OP;
+}
+/*..........................................................................*/
+/* ...String -&gt; Enum. */
+SerialFlow_t str_to_flowcontrol(const char *str) {
+    if (!str) return SP_FLOW_NONE_OP;
+    if (strcmp(str, &quot;Xon/Xoff&quot;) == 0)   return SP_FLOW_XON_XOFF_OP;
+    else if (strcmp(str, &quot;RTS/CTS&quot;) == 0) return SP_FLOW_RTS_CTS_OP;
+    else if (strcmp(str, &quot;DTR/DSR&quot;) == 0) return SP_FLOW_DTR_DSR_OP;
+    return SP_FLOW_NONE_OP;
+}
+/*..........................................................................*/
+bool SpMngr_comNameIsInvalid(char *comName) {
+    if (
+        (strcmp(comName, &quot;NULL&quot;) == 0) ||
+            (strcmp(comName, &quot;ERROR&quot;) == 0)
+    ) {
+        return false;
+    }
+    return true;
+}
+
+/*..........................................................................*/
+/* ...State machine. */
+$define ${AOs::SpMngr}</text>
+  </file>
+ </directory>
+</model>

@@ -1,0 +1,45 @@
+/*****************************************************************************
+ * Copyright (C) 2026 Sunny Matato
+ *
+ * This program is free software. It comes without any warranty, to
+ * the extent permitted by applicable law. You can redistribute it
+ * and/or modify it under the terms of the Do What The Fuck You Want
+ * To Public License, Version 2, as published by Sam Hocevar.
+ * See http://www.wtfpl.net/ for more details.
+ ****************************************************************************/
+/*==========================================================================*/
+#ifndef BSP_H_
+#define BSP_H_
+
+/*==========================================================================*/
+#define BSP_TICKS_PER_SEC  100U  /* System tick frequency. */
+
+/*==========================================================================*/
+/**
+ * @brief
+ */
+void BSP_init(void);
+/*..........................................................................*/
+/**
+ * @brief
+ */
+void BSP_ledOff(void);
+/*..........................................................................*/
+/**
+ * @brief
+ */
+void BSP_ledOn(void);
+
+/*==========================================================================*/
+/**
+ * @brief Deliver the text to system clipboard.
+ *
+ * @param text
+ */
+void BSP_deliverClipboard(const char *text);
+
+/*==========================================================================*/
+#include "bsp_lvgl.h"
+#include "bsp_serial_port.h"
+
+#endif  /* BSP_H_ */
