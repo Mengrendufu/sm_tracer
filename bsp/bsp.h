@@ -41,5 +41,6 @@ void BSP_deliverClipboard(const char *text);
 /*==========================================================================*/
 #include "bsp_lvgl.h"
 #include "bsp_serial_port.h"
+#include "bsp_sdl_msgbuf.h"
 
 #endif  /* BSP_H_ */
