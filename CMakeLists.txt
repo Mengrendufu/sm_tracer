@@ -216,6 +216,10 @@ target_link_libraries(${PROJECT_NAME}
     serialport
 )
 
+if(WIN32)
+    target_link_libraries(${PROJECT_NAME} dwmapi)
+endif()
+
 #
 # Debug infomations ==========================================================
 #
