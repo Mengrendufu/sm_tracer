@@ -98,13 +98,17 @@ void BSP_lvgl_task(uint32_t dt_ms) {
 /*..........................................................................*/
 void BSP_lvgl_render(void) {
     if (l_texture && l_renderer_ref) {
-        /* Texture --> Renderer */
-        SDL_RenderCopy(l_renderer_ref, l_texture, NULL, NULL);
+        /* Blit LVGL texture only into the upper panel area. */
+        int w = 0, h = 0;
+        SDL_QueryTexture(l_texture, NULL, NULL, &w, &h);
+        SDL_Rect dst = { 0, 0, w, h };
+        SDL_RenderCopy(l_renderer_ref, l_texture, NULL, &dst);
     }
 }
 
 /*==========================================================================*/
 void BSP_lvgl_resize(int width, int height) {
+    (void)height;  /* LVGL panel is fixed-height; only width may change. */
     if (l_texture) {
         SDL_DestroyTexture(l_texture);
         l_texture = NULL;
@@ -114,13 +118,13 @@ void BSP_lvgl_resize(int width, int height) {
                     l_renderer_ref,
                     SDL_PIXELFORMAT_ARGB8888,
                     SDL_TEXTUREACCESS_STREAMING,
-                    width, height);
+                    width, LVGL_WIND_HEIGHT);
     Q_ENSURE(l_texture != NULL);
 
     lv_disp_t * disp = lv_disp_get_default();
     if (disp) {
         disp->driver->hor_res = width;
-        disp->driver->ver_res = height;
+        disp->driver->ver_res = LVGL_WIND_HEIGHT;
         lv_disp_drv_update(disp, disp->driver);
     }
     lv_refr_now(NULL);  /* Refresh now. */
