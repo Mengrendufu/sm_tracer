@@ -8,7 +8,6 @@
  * See http://www.wtfpl.net/ for more details.
  ****************************************************************************/
 /*==========================================================================*/
-/* ...Redefine main() on some platforms so that it is called by SDL. */
 #define SDL_MAIN_HANDLED
 
 /*==========================================================================*/
@@ -16,77 +15,99 @@
 #include "bsp.h"
 #include "application.h"
 
+#ifdef _WIN32
+#include "SDL_syswm.h"
+#endif
+
 /*==========================================================================*/
-/* ...SDL. */
-#define SDL_WINDOW_MAX_WIDTH  2048
-#define SDL_WINDOW_MAX_HEIGHT 1266
-static SDL_Window *l_window   = NULL;
+static SDL_Window   *l_window   = NULL;
 static SDL_Renderer *l_renderer = NULL;
-static int l_running  = 1;
+static int           l_running  = 1;
 
-/*==========================================================================*/
-/* ...QF_run Thread. */
 static SDL_Thread *l_qp_worker = NULL;
-static volatile bool l_gui_ready = false;
 
-/*==========================================================================*/
-/* ...Render mutex: guards LVGL + SDL render calls shared between the main
- * loop and the window event watcher (which runs on the OS event thread). */
-static SDL_mutex *l_render_mutex = NULL;
+#define RENDER_INTERVAL_MS 16
 
 /*==========================================================================*/
 static void SDL_WndProc(SDL_Event *e);
+static void do_render_frame(void);
+
+#ifdef _WIN32
+#define MODAL_TIMER_ID 1
+#define MODAL_TIMER_MS 16
+
+static WNDPROC l_orig_wndproc = NULL;
+
+static LRESULT CALLBACK win32_subclass_proc(HWND hwnd, UINT msg,
+                                            WPARAM wp, LPARAM lp) {
+    switch (msg) {
+        case WM_NCLBUTTONDOWN:
+        case WM_ENTERSIZEMOVE:
+            SetTimer(hwnd, MODAL_TIMER_ID, MODAL_TIMER_MS, NULL);
+            break;
+        case WM_NCLBUTTONUP:
+        case WM_EXITSIZEMOVE:
+            KillTimer(hwnd, MODAL_TIMER_ID);
+            break;
+        case WM_SIZING:
+        case WM_MOVING: {
+            /* Do NOT call BSP_lvgl_resize / BSP_msgbuf_resize here.
+             * The RECT from WM_SIZING is the outer window frame (includes
+             * title bar + borders), not the SDL client area.  Passing those
+             * inflated dimensions corrupts the panel layout and hides the
+             * scrollbar.  SDL_WINDOWEVENT_SIZE_CHANGED fires after the resize
+             * completes and carries the correct client dimensions — that
+             * handler owns the resize.  We only need to keep rendering so the
+             * window looks live during the drag. */
+            do_render_frame();
+            break;
+        }
+        case WM_TIMER:
+            if (wp == MODAL_TIMER_ID) {
+                SDL_Event e;
+                while (SDL_PollEvent(&e)) {
+                    SDL_WndProc(&e);
+                }
+                do_render_frame();
+            }
+            break;
+        default: break;
+    }
+    return CallWindowProcW(l_orig_wndproc, hwnd, msg, wp, lp);
+}
+
+static void win32_install_subclass(SDL_Window *window) {
+    SDL_SysWMinfo wmi;
+    SDL_VERSION(&wmi.version);
+    if (!SDL_GetWindowWMInfo(window, &wmi)) return;
+    if (wmi.subsystem != SDL_SYSWM_WINDOWS) return;
+    HWND hwnd = wmi.info.win.window;
+    l_orig_wndproc = (WNDPROC)(LONG_PTR)GetWindowLongPtrW(hwnd, GWLP_WNDPROC);
+    SetWindowLongPtrW(hwnd, GWLP_WNDPROC, (LONG_PTR)win32_subclass_proc);
+}
+#endif /* _WIN32 */
 
 /*==========================================================================*/
-/* ...Window event watcher (runs on the OS event thread).
- * On Windows, dragging/resizing triggers a modal loop that blocks
- * SDL_WaitEventTimeout in the main thread. This watcher fires inside that
- * modal loop, drains the event queue, advances LVGL, and renders — keeping
- * the display live while the window is being moved or resized. */
-static int SDL_wdEvtWatcher(void *data, SDL_Event *e) {
-    (void)data;
-    if (e->type != SDL_WINDOWEVENT) return 0;
-    if (e->window.event != SDL_WINDOWEVENT_MOVED
-            && e->window.event != SDL_WINDOWEVENT_RESIZED
-            && e->window.event != SDL_WINDOWEVENT_SIZE_CHANGED) return 0;
-    if (!l_render_mutex || !l_renderer || !l_gui_ready) return 0;
+static void do_render_frame(void) {
+    static uint32_t last_tick = 0;
+    if (last_tick == 0) last_tick = SDL_GetTicks();
 
-    SDL_LockMutex(l_render_mutex);
-
-    SDL_Event pending;
-    while (SDL_PollEvent(&pending)) {
-        SDL_WndProc(&pending);
-    }
-
-    uint32_t now = SDL_GetTicks();
-    static uint32_t s_last = 0;
-    if (s_last == 0) s_last = now;
-    uint32_t diff = now - s_last;
+    uint32_t now  = SDL_GetTicks();
+    uint32_t diff = now - last_tick;
     if (diff > 0) {
         BSP_lvgl_task(diff);
-        s_last = now;
+        last_tick = now;
     }
 
     SDL_SetRenderDrawColor(l_renderer, 0, 0, 0, 255);
     SDL_RenderClear(l_renderer);
     BSP_lvgl_render();
+    BSP_msgbuf_render();
     SDL_RenderPresent(l_renderer);
-
-    SDL_UnlockMutex(l_render_mutex);
-    return 0;
 }
 
 /*==========================================================================*/
-/* ...QF_run thread. */
-extern int main_gui(void);  /* QF_run main */
-static int SDLCALL appThread(void *par);  /* QF_run thread loop. */
-/*..........................................................................*/
-/* ...QF_run thread creating trigger. */
-static void SDL_createAppThread(void) {
-    l_qp_worker = SDL_CreateThread(appThread, "QP_Worker", NULL);
-    l_gui_ready = true;
-}
-/*..........................................................................*/
+extern int main_gui(void);
 static int SDLCALL appThread(void *par) {
     (void)par;
     return main_gui();
@@ -95,65 +116,62 @@ static int SDLCALL appThread(void *par) {
 /*==========================================================================*/
 static void SDL_WndProc(SDL_Event *e) {
     switch (e->type) {
-        /* Window closed */
         case SDL_QUIT: {
             l_running = 0;
             QF_stop();
             break;
         }
 
-        /* SDL window events */
         case SDL_WINDOWEVENT: {
             switch (e->window.event) {
                 case SDL_WINDOWEVENT_RESIZED:
-                case SDL_WINDOWEVENT_SIZE_CHANGED:
-                {
-                    if (l_gui_ready) {
-                        int new_w = e->window.data1;
-                        int new_h = e->window.data2;
-                        BSP_lvgl_resize(new_w, new_h);
-                    }
+                case SDL_WINDOWEVENT_SIZE_CHANGED: {
+                    BSP_lvgl_resize(e->window.data1, e->window.data2);
+                    BSP_msgbuf_resize(e->window.data1, e->window.data2);
                     break;
                 }
-                default: {
-                    break;
-                }
+                default: break;
             }
             break;
         }
 
-        /* ...Mouse actions. */
         case SDL_MOUSEMOTION: {
             BSP_lvgl_feed_mouse(
-                            e->motion.x, e->motion.y,
-                            (e->motion.state & SDL_BUTTON_LMASK));
+                e->motion.x, e->motion.y,
+                (e->motion.state & SDL_BUTTON_LMASK));
+            BSP_msgbuf_mouse_motion(
+                e->motion.x, e->motion.y,
+                (e->motion.state & SDL_BUTTON_LMASK));
             break;
         }
         case SDL_MOUSEBUTTONDOWN: {
             if (e->button.button == SDL_BUTTON_LEFT) {
                 BSP_lvgl_feed_mouse(e->button.x, e->button.y, true);
+                BSP_msgbuf_mouse_button(e->button.x, e->button.y, true);
             }
             break;
         }
         case SDL_MOUSEBUTTONUP: {
             if (e->button.button == SDL_BUTTON_LEFT) {
                 BSP_lvgl_feed_mouse(e->button.x, e->button.y, false);
+                BSP_msgbuf_mouse_button(e->button.x, e->button.y, false);
             }
             break;
         }
 
-        /* System Keyboard: "Ctrl + c". */
+        case SDL_MOUSEWHEEL: {
+            BSP_msgbuf_mouse_wheel(e->wheel.y);
+            break;
+        }
+
         case SDL_KEYDOWN: {
-            if (
-                (e->key.keysym.sym == SDLK_c)
-                    && (e->key.keysym.mod & KMOD_CTRL)
-            ) {
-                /* Dummy... */
+            if ((e->key.keysym.sym == SDLK_c)
+                    && (e->key.keysym.mod & KMOD_CTRL)) {
+                BSP_msgbuf_copy_selection();
             }
             break;
         }
 
-        /* LVGL... */
         case DISP_UPDATE_CLOSE_STATE_SIG: {
             GUI_updateSerialCnnState(DISPLAY_STATE_CLOSED);
             break;
@@ -170,105 +188,77 @@ static void SDL_WndProc(SDL_Event *e) {
             GUI_updateSerialCnnState(DISPLAY_STATE_CLOSING);
             break;
         }
-
         case DISP_UPDATE_COM_DROPDOWN_BOX_INFO_SIG: {
             GUI_updateComLists((char *)e->user.data1);
             break;
         }
-
         case DISP_UPDATE_LOADED_JSON_FILE_SIG: {
             GUI_updateLoadedJsonFile((char *)e->user.data1);
             break;
         }
-
         case DISP_UPDATE_RECV_BOX_MSG_SIG: {
             GUI_updateRecvBoxMsg((char *)(e->user.data1));
             break;
         }
 
-        default: {
-            break;
-        }
+        default: break;
     }
 }
 
 /*==========================================================================*/
-/* ===SDL main. */
 int main(int argc, char *argv[]) {
     (void)argc;
     (void)argv;
 
-    SDL_Event msg;
-
-    /* SDL HardWare initialization */
     if (SDL_Init(SDL_INIT_VIDEO) < 0) return -1;
 
-    l_render_mutex = SDL_CreateMutex();
-    if (!l_render_mutex) return -1;
+    SDL_SetHint(SDL_HINT_RENDER_DRIVER, "opengl");
 
-    /* SDL Window. */
     l_window = SDL_CreateWindow(
                     "SM_Tracer",
                     SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
-                    LVGL_WIND_WIDTH, LVGL_WIND_HEIGHT,
-                    SDL_WINDOW_SHOWN);
+                    LVGL_WIND_WIDTH, LVGL_WIND_HEIGHT + MSGBUF_PANEL_HEIGHT,
+                    SDL_WINDOW_SHOWN | SDL_WINDOW_RESIZABLE | SDL_WINDOW_OPENGL);
+    if (!l_window) return -1;
 
-    SDL_SetWindowMaximumSize(
-        l_window, SDL_WINDOW_MAX_WIDTH, SDL_WINDOW_MAX_HEIGHT);
-
-    /* SDL Render */
-    l_renderer = SDL_CreateRenderer(
-                    l_window,
-                    -1,
-                    SDL_RENDERER_ACCELERATED);
-    /* Make sure the render is initialized correctly */
+    l_renderer = SDL_CreateRenderer(l_window, -1, SDL_RENDERER_ACCELERATED);
     if (!l_renderer) return -1;
 
-    /* LVGL... */
+    int win_w, win_h;
+    SDL_GetWindowSize(l_window, &win_w, &win_h);
+
     BSP_lvgl_cfg_t lvgl_cfg = {
-        .renderer = (void*)l_renderer,
-        .screen_width  = LVGL_WIND_WIDTH,
+        .renderer      = (void *)l_renderer,
+        .screen_width  = win_w,
         .screen_height = LVGL_WIND_HEIGHT
     };
     BSP_lvgl_init(&lvgl_cfg);
+    BSP_msgbuf_init(l_renderer, LVGL_WIND_HEIGHT, win_w, MSGBUF_PANEL_HEIGHT);
+
     GUI_init();
 
-    SDL_AddEventWatch(SDL_wdEvtWatcher, NULL);
+#ifdef _WIN32
+    win32_install_subclass(l_window);
+#endif
 
-    /* Spwam app thread... */
-    SDL_createAppThread();
+    l_qp_worker = SDL_CreateThread(appThread, "QP_Worker", NULL);
 
-
-
-    /* Super loop... */
-    uint32_t last_tick = SDL_GetTicks();
     while (l_running) {
-        SDL_LockMutex(l_render_mutex);
-
-        uint32_t current_tick = SDL_GetTicks();
-        uint32_t diff = current_tick - last_tick;
-        if (diff > 0) {
-            BSP_lvgl_task(diff);
-            last_tick = current_tick;
+        SDL_Event msg;
+        if (SDL_WaitEventTimeout(&msg, RENDER_INTERVAL_MS)) {
+            SDL_WndProc(&msg);
+            SDL_Event pending;
+            while (SDL_PollEvent(&pending)) {
+                SDL_WndProc(&pending);
+            }
         }
-
-        if (SDL_WaitEventTimeout(&msg, 5)) SDL_WndProc(&msg);
-
-        SDL_SetRenderDrawColor(l_renderer, 0, 0, 0, 255);
-        SDL_RenderClear(l_renderer);
-        BSP_lvgl_render();
-        SDL_RenderPresent(l_renderer);
-
-        SDL_UnlockMutex(l_render_mutex);
+        do_render_frame();
     }
 
-    /* Spawn-thread clean ... */
     if (l_qp_worker) SDL_WaitThread(l_qp_worker, NULL);
 
-    /* SDL thread clean ... */
     SDL_DestroyRenderer(l_renderer);
     SDL_DestroyWindow(l_window);
-    SDL_DestroyMutex(l_render_mutex);
     SDL_Quit();
 
     return 0;
