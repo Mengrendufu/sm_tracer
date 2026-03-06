@@ -756,18 +756,14 @@ void GUI_updateLoadedJsonFile(char *fileName) {
  * @param[in] s
  */
 static void GUI_dispMsg(char *s) {
-    printf("%s", s);
+    BSP_msgbuf_append(s);
 }
 /*..........................................................................*/
 void GUI_updateRecvBoxMsg(char *dispMsg) {
     GUI_dispMsg(dispMsg);
-    free(dispMsg);  /*! GC. */
+    /* Ownership transferred to BSP_msgbuf_append; do NOT free here. */
 }
 /*..........................................................................*/
 void GUI_msgBoxClean(void) {
-#ifdef _WIN32
-    system("cls"); /* Windows. */
-#else
-    system("clear"); /* Linux/macOS. */
-#endif
+    BSP_msgbuf_clear();
 }
