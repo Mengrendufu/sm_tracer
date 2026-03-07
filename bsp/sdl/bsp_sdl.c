@@ -244,7 +244,16 @@ int main(int argc, char *argv[]) {
                     "SM_Tracer",
                     SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
                     LVGL_WIND_WIDTH, LVGL_WIND_HEIGHT + MSGBUF_PANEL_HEIGHT,
-                    SDL_WINDOW_SHOWN | SDL_WINDOW_RESIZABLE | SDL_WINDOW_OPENGL);
+#ifdef _WIN32
+                    /* On Windows, do NOT force SDL_WINDOW_OPENGL — let SDL pick
+                     * D3D11 so PRESENTVSYNC uses the DXGI flip model (genuinely
+                     * blocking) instead of wglSwapBuffers which busy-waits on
+                     * many GPU drivers and causes ~18-25% idle CPU. */
+                    SDL_WINDOW_SHOWN | SDL_WINDOW_RESIZABLE
+#else
+                    SDL_WINDOW_SHOWN | SDL_WINDOW_RESIZABLE | SDL_WINDOW_OPENGL
+#endif
+                    );
     if (!l_window) return -1;
 
     l_renderer = SDL_CreateRenderer(l_window, -1,

@@ -542,6 +542,7 @@ void BSP_msgbuf_mouse_motion(int x, int y, bool pressed) {
     if (pressed && l_mouse_down && !in_scrollbar(x)) {
         l_sel_end.row = pixel_to_row(y);
         l_sel_end.col = pixel_to_col(x);
+        l_cache_dirty = true;
     }
 
     if (pressed && l_mouse_down && in_scrollbar(x)) {
@@ -556,8 +557,8 @@ void BSP_msgbuf_mouse_motion(int x, int y, bool pressed) {
         if (new_top > total - rows) new_top = total - rows;
         l_scroll_top  = new_top;
         l_auto_scroll = (new_top >= total - rows);
+        l_cache_dirty = true;
     }
-    l_cache_dirty = true;
 }
 
 /*==========================================================================*/
