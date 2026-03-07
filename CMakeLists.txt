@@ -57,79 +57,50 @@ file(GLOB_RECURSE QPC_SRC
 )
 
 #
-# component SDL2 =============================================================
+# component SDL2 (prebuilt shared library) ===================================
 #
-set(SDL_SHARED OFF CACHE BOOL "" FORCE)
-set(SDL_STATIC ON  CACHE BOOL "" FORCE)
-add_subdirectory(3rd_party/sdl2)
-
-#
-# component libserialport ====================================================
-#
-set(LIBSERIALPORT_SRC_DIR ${CMAKE_SOURCE_DIR}/3rd_party/libserialport)
-
-# Build libserialport as a static library (it has no CMakeLists.txt)
+set(SDL2_LIBS_DIR "${CMAKE_SOURCE_DIR}/3rd_party/libs/SDL2")
+add_library(SDL2::SDL2 SHARED IMPORTED GLOBAL)
 if(WIN32)
-    set(SERIALPORT_PLATFORM_SRC
-        ${LIBSERIALPORT_SRC_DIR}/windows.c
+    set_target_properties(SDL2::SDL2 PROPERTIES
+        IMPORTED_LOCATION  "${SDL2_LIBS_DIR}/windows/SDL2.dll"
+        IMPORTED_IMPLIB    "${SDL2_LIBS_DIR}/windows/libSDL2.dll.a"
+        INTERFACE_INCLUDE_DIRECTORIES "${SDL2_LIBS_DIR}/windows/include"
     )
-    set(SERIALPORT_PLATFORM_LIBS setupapi)
 elseif(APPLE)
-    set(SERIALPORT_PLATFORM_SRC
-        ${LIBSERIALPORT_SRC_DIR}/macosx.c
+    set_target_properties(SDL2::SDL2 PROPERTIES
+        IMPORTED_LOCATION "${SDL2_LIBS_DIR}/macos/libSDL2.dylib"
+        INTERFACE_INCLUDE_DIRECTORIES "${SDL2_LIBS_DIR}/macos/include"
     )
-    set(SERIALPORT_PLATFORM_LIBS "-framework IOKit" "-framework CoreFoundation")
-else()
-    # Linux — POSIX logic is already in serialport.c, only add linux-specific files
-    set(SERIALPORT_PLATFORM_SRC
-        ${LIBSERIALPORT_SRC_DIR}/linux.c
-        ${LIBSERIALPORT_SRC_DIR}/linux_termios.c
-    )
-    find_package(PkgConfig QUIET)
-    if(PkgConfig_FOUND)
-        pkg_check_modules(LIBUDEV libudev)
-    endif()
-    if(LIBUDEV_FOUND)
-        set(SERIALPORT_PLATFORM_LIBS ${LIBUDEV_LIBRARIES})
-    else()
-        set(SERIALPORT_PLATFORM_LIBS "")
-    endif()
-endif()
-
-# Generate minimal config.h for libserialport (replaces autoconf output)
-set(LIBSP_CONFIG_DIR "${CMAKE_BINARY_DIR}/libserialport_config")
-file(MAKE_DIRECTORY "${LIBSP_CONFIG_DIR}")
-if(WIN32)
-    file(WRITE "${LIBSP_CONFIG_DIR}/config.h" "/* Minimal config.h for libserialport — Windows/CMake build */\n#define PACKAGE_VERSION \"0.1.1\"\n#define SP_PRIV\n")
-else()
-    file(WRITE "${LIBSP_CONFIG_DIR}/config.h"
-        "/* Minimal config.h for libserialport — Unix/CMake build */\n"
-        "#define HAVE_SYS_FILE_H 1\n"
-        "#define HAVE_FLOCK 1\n"
-        "#define HAVE_TERMIOS_H 1\n"
-        "#define HAVE_STRUCT_SERIAL_STRUCT 1\n"
-        "#define PACKAGE_VERSION \"0.1.1\"\n"
-        "#define SP_PRIV\n"
+else()  # Linux
+    set_target_properties(SDL2::SDL2 PROPERTIES
+        IMPORTED_LOCATION "${SDL2_LIBS_DIR}/linux/libSDL2.so"
+        INTERFACE_INCLUDE_DIRECTORIES "${SDL2_LIBS_DIR}/linux/include"
     )
 endif()
 
-add_library(serialport STATIC
-    ${LIBSERIALPORT_SRC_DIR}/serialport.c
-    ${LIBSERIALPORT_SRC_DIR}/timing.c
-    ${SERIALPORT_PLATFORM_SRC}
-)
-target_include_directories(serialport
-    PUBLIC  ${LIBSERIALPORT_SRC_DIR}
-    PRIVATE ${LIBSP_CONFIG_DIR}
-)
-# libserialport: use MSBUILD path (skips autoconf config.h include in internal header)
-target_compile_definitions(serialport PRIVATE
-    LIBSERIALPORT_MSBUILD
-)
+#
+# component libserialport (prebuilt shared library) ==========================
+#
+set(SERIALPORT_LIBS_DIR "${CMAKE_SOURCE_DIR}/3rd_party/libs/libserialport")
+add_library(serialport SHARED IMPORTED GLOBAL)
 if(WIN32)
-    target_compile_definitions(serialport PRIVATE _WIN32_WINNT=0x0501)
+    set_target_properties(serialport PROPERTIES
+        IMPORTED_LOCATION  "${SERIALPORT_LIBS_DIR}/windows/libserialport-0.dll"
+        IMPORTED_IMPLIB    "${SERIALPORT_LIBS_DIR}/windows/libserialport.dll.a"
+        INTERFACE_INCLUDE_DIRECTORIES "${SERIALPORT_LIBS_DIR}/windows/include"
+    )
+elseif(APPLE)
+    set_target_properties(serialport PROPERTIES
+        IMPORTED_LOCATION "${SERIALPORT_LIBS_DIR}/macos/libserialport.dylib"
+        INTERFACE_INCLUDE_DIRECTORIES "${SERIALPORT_LIBS_DIR}/macos/include"
+    )
+else()  # Linux
+    set_target_properties(serialport PROPERTIES
+        IMPORTED_LOCATION "${SERIALPORT_LIBS_DIR}/linux/libserialport.so"
+        INTERFACE_INCLUDE_DIRECTORIES "${SERIALPORT_LIBS_DIR}/linux/include"
+    )
 endif()
-target_link_libraries(serialport ${SERIALPORT_PLATFORM_LIBS})
 
 #
 # component LVGL =============================================================
@@ -210,11 +181,30 @@ add_executable(${PROJECT_NAME} ${ALL_SOURCES})
 #
 target_link_libraries(${PROJECT_NAME}
     # SDL_MAIN_HANDLED is defined in bsp_sdl.c, so SDL2main must NOT be linked.
-    # mingw32 is still required on Windows as the MinGW runtime entry point.
-    $<$<BOOL:${WIN32}>:mingw32>
-    SDL2::SDL2-static
+    SDL2::SDL2
     serialport
 )
+
+# Windows: copy DLLs to executable directory at build time
+if(WIN32)
+    add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            "${SDL2_LIBS_DIR}/windows/SDL2.dll"
+            $<TARGET_FILE_DIR:${PROJECT_NAME}>
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            "${SERIALPORT_LIBS_DIR}/windows/libserialport-0.dll"
+            $<TARGET_FILE_DIR:${PROJECT_NAME}>
+    )
+endif()
+
+# Linux/macOS: embed rpath so the executable finds shared libs at runtime
+if(NOT WIN32)
+    set_target_properties(${PROJECT_NAME} PROPERTIES
+        BUILD_RPATH
+            "${SDL2_LIBS_DIR}/$<IF:$<BOOL:${APPLE}>,macos,linux>;${SERIALPORT_LIBS_DIR}/$<IF:$<BOOL:${APPLE}>,macos,linux>"
+        INSTALL_RPATH_USE_LINK_PATH TRUE
+    )
+endif()
 
 if(WIN32)
     target_link_libraries(${PROJECT_NAME} dwmapi)
