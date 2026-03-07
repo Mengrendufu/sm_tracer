@@ -1,0 +1,9 @@
+[submodule "3rd_party/cJSON"]
+	path = 3rd_party/cJSON
+	url = https://github.com/DaveGamble/cJSON.git
+[submodule "3rd_party/sm_hsm"]
+	path = 3rd_party/sm_hsm
+	url = https://github.com/Mengrendufu/sm_hsm.git
+[submodule "3rd_party/lvgl"]
+	path = 3rd_party/lvgl
+	url = https://github.com/lvgl/lvgl.git
