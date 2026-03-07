@@ -21,12 +21,19 @@
 *.a
 *.la
 *.lo
+!3rd_party/libs/**/*.dll.a
 
 # Shared objects (inc. Windows DLLs)
 *.dll
 *.so
 *.so.*
 *.dylib
+
+# Prebuilt libs shipped with the repo — must be tracked
+!3rd_party/libs/**/*.dll
+!3rd_party/libs/**/*.so
+!3rd_party/libs/**/*.so.*
+!3rd_party/libs/**/*.dylib
 
 # Executables
 *.exe
