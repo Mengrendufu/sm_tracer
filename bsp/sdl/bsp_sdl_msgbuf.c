@@ -176,6 +176,23 @@ static SelPt         l_sel_start;
 static SelPt         l_sel_end;
 static bool          l_mouse_down   = false;
 
+static SDL_Texture  *l_panel_cache  = NULL;  /* off-screen render target */
+static bool          l_cache_dirty  = true;  /* repaint needed */
+
+/*==========================================================================*/
+static void create_panel_cache(void) {
+    if (l_panel_cache) {
+        SDL_DestroyTexture(l_panel_cache);
+        l_panel_cache = NULL;
+    }
+    if (l_panel_w <= 0 || l_panel_h <= 0) return;
+    l_panel_cache = SDL_CreateTexture(l_renderer,
+                                      SDL_PIXELFORMAT_RGBA8888,
+                                      SDL_TEXTUREACCESS_TARGET,
+                                      l_panel_w, l_panel_h);
+    l_cache_dirty = true;
+}
+
 /*==========================================================================*/
 static int buf_line_count(void) {
     return l_line_count;
@@ -273,6 +290,7 @@ void BSP_msgbuf_init(void *renderer, int panel_y, int panel_w, int panel_h) {
     l_mouse_down  = false;
 
     build_font_atlas();
+    create_panel_cache();
 }
 
 /*==========================================================================*/
@@ -286,6 +304,7 @@ void BSP_msgbuf_append(char *msg) {
         int total = buf_line_count();
         l_scroll_top = (total > rows) ? (total - rows) : 0;
     }
+    l_cache_dirty = true;
 }
 
 /*==========================================================================*/
@@ -295,6 +314,7 @@ void BSP_msgbuf_clear(void) {
     l_scroll_top = 0;
     l_auto_scroll = true;
     l_sel_active  = false;
+    l_cache_dirty = true;
 }
 
 /*==========================================================================*/
@@ -329,13 +349,13 @@ static bool char_in_selection(int line_idx, int col) {
 }
 
 /*==========================================================================*/
-static void draw_scrollbar(void) {
+static void draw_scrollbar_to_cache(void) {
     int total  = buf_line_count();
     int rows   = visible_rows();
     if (total <= rows) return;
 
     int track_x = l_panel_w - SCROLLBAR_W + 1;
-    int track_y = l_panel_y + PAD_Y;
+    int track_y = PAD_Y;
     int track_h = l_panel_h - PAD_Y * 2;
 
     SDL_SetRenderDrawColor(l_renderer, 30, 31, 40, 255);
@@ -381,11 +401,11 @@ static const uint8_t s_ban_glyphs[][7] = {
 };
 #define BAN_NLETTERS 11
 
-static void draw_banner(void) {
+static void draw_banner_to_cache(void) {
     int total_w = BAN_NLETTERS * BAN_CHAR_W + (BAN_NLETTERS - 1) * BAN_LETTER_GAP;
     int total_h = BAN_CHAR_H;
     int ox = (l_panel_w - total_w) / 2;
-    int oy = l_panel_y + (l_panel_h - total_h) / 2;
+    int oy = (l_panel_h - total_h) / 2;
 
     SDL_SetRenderDrawColor(l_renderer, 86, 182, 255, 255);
     for (int li = 0; li < BAN_NLETTERS; li++) {
@@ -409,46 +429,52 @@ static void draw_banner(void) {
 /*==========================================================================*/
 void BSP_msgbuf_render(void) {
     if (!l_renderer) return;
+    if (!l_panel_cache) return;
 
-    SDL_Rect panel = { 0, l_panel_y, l_panel_w, l_panel_h };
-    SDL_SetRenderDrawColor(l_renderer, 21, 22, 30, 255);
-    SDL_RenderFillRect(l_renderer, &panel);
+    if (l_cache_dirty) {
+        SDL_SetRenderTarget(l_renderer, l_panel_cache);
+        SDL_SetRenderDrawBlendMode(l_renderer, SDL_BLENDMODE_NONE);
 
-    /* 1px separator line between LVGL and msgbuf panel */
-    SDL_SetRenderDrawColor(l_renderer, 49, 50, 68, 255);
-    SDL_RenderDrawLine(l_renderer, 0, l_panel_y, l_panel_w, l_panel_y);
+        SDL_SetRenderDrawColor(l_renderer, 21, 22, 30, 255);
+        SDL_Rect full = { 0, 0, l_panel_w, l_panel_h };
+        SDL_RenderFillRect(l_renderer, &full);
 
-    int rows     = visible_rows();
-    int total    = buf_line_count();
-    int max_cols = text_area_w() / CELL_W;
+        SDL_SetRenderDrawColor(l_renderer, 49, 50, 68, 255);
+        SDL_RenderDrawLine(l_renderer, 0, 0, l_panel_w, 0);
 
-    if (total == 0) {
-        draw_banner();
-        return;
-    }
+        int rows     = visible_rows();
+        int total    = buf_line_count();
+        int max_cols = text_area_w() / CELL_W;
 
-    for (int r = 0; r < rows; r++) {
-        int line_idx = l_scroll_top + r;
-        if (line_idx >= total) break;
-
-        Line *ln = buf_line_at(line_idx);
-        int py   = l_panel_y + PAD_Y + r * LINE_H;
-
-        for (int c = 0; c < ln->len && c < max_cols; c++) {
-            int px = PAD_X + c * CELL_W;
-
-            if (char_in_selection(line_idx, c)) {
-                SDL_Rect sel_rect = { px, py, CELL_W, CELL_H };
-                SDL_SetRenderDrawColor(l_renderer, 62, 68, 81, 255);
-                SDL_RenderFillRect(l_renderer, &sel_rect);
-                draw_glyph(px, py, (unsigned char)ln->text[c], 229, 229, 229);
-            } else {
-                draw_glyph(px, py, (unsigned char)ln->text[c], 171, 178, 191);
+        if (total == 0) {
+            draw_banner_to_cache();
+        } else {
+            for (int r = 0; r < rows; r++) {
+                int line_idx = l_scroll_top + r;
+                if (line_idx >= total) break;
+                Line *ln = buf_line_at(line_idx);
+                int py = PAD_Y + r * LINE_H;
+                for (int c = 0; c < ln->len && c < max_cols; c++) {
+                    int px = PAD_X + c * CELL_W;
+                    if (char_in_selection(line_idx, c)) {
+                        SDL_Rect sel_rect = { px, py, CELL_W, CELL_H };
+                        SDL_SetRenderDrawColor(l_renderer, 62, 68, 81, 255);
+                        SDL_RenderFillRect(l_renderer, &sel_rect);
+                        draw_glyph(px, py, (unsigned char)ln->text[c], 229, 229, 229);
+                    } else {
+                        draw_glyph(px, py, (unsigned char)ln->text[c], 171, 178, 191);
+                    }
+                }
             }
+            draw_scrollbar_to_cache();
         }
+
+        SDL_SetRenderTarget(l_renderer, NULL);
+        l_cache_dirty = false;
     }
 
-    draw_scrollbar();
+    SDL_Rect dst = { 0, l_panel_y, l_panel_w, l_panel_h };
+    SDL_RenderCopy(l_renderer, l_panel_cache, NULL, &dst);
 }
 
 /*==========================================================================*/
@@ -501,6 +527,7 @@ void BSP_msgbuf_mouse_button(int x, int y, bool down) {
         l_scroll_top  = new_top;
         l_auto_scroll = (new_top >= total - rows);
     }
+    l_cache_dirty = true;
 }
 
 /*==========================================================================*/
@@ -525,6 +552,7 @@ void BSP_msgbuf_mouse_motion(int x, int y, bool pressed) {
         l_scroll_top  = new_top;
         l_auto_scroll = (new_top >= total - rows);
     }
+    l_cache_dirty = true;
 }
 
 /*==========================================================================*/
@@ -537,6 +565,7 @@ void BSP_msgbuf_mouse_wheel(int dy) {
     if (total > rows && l_scroll_top > total - rows) l_scroll_top = total - rows;
 
     l_auto_scroll = (total <= rows) || (l_scroll_top >= total - rows);
+    l_cache_dirty = true;
 }
 
 /*==========================================================================*/
@@ -596,4 +625,5 @@ void BSP_msgbuf_resize(int new_w, int new_h) {
     if (l_auto_scroll && total > rows) {
         l_scroll_top = total - rows;
     }
+    create_panel_cache();
 }
