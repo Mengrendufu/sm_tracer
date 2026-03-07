@@ -94,6 +94,17 @@ def run():
         error("Binary execution failed.")
         sys.exit(1)
 
+def setup():
+    header("Initializing git submodules...")
+    try:
+        subprocess.run([
+            "git", "submodule", "update", "--init", "--recursive"
+        ], check=True, cwd=str(get_script_dir()))
+        success("Submodules initialized.")
+    except subprocess.CalledProcessError as e:
+        error("git submodule update failed.")
+        sys.exit(1)
+
 def main():
     parser = argparse.ArgumentParser(description="sm_tracer build tool")
     subparsers = parser.add_subparsers(dest="command", help="Subcommands")
@@ -102,6 +113,7 @@ def main():
     parser_build = subparsers.add_parser("build", help="Build project (default)")
     parser_clean = subparsers.add_parser("clean", help="Remove build directory")
     parser_run = subparsers.add_parser("run", help="Build and run binary")
+    parser_setup = subparsers.add_parser("setup", help="Initialize git submodules (run once after clone)")
 
     args = parser.parse_args()
     cmd = args.command or "build"
@@ -114,6 +126,8 @@ def main():
         clean()
     elif cmd == "run":
         run()
+    elif cmd == "setup":
+        setup()
     else:
         parser.print_help()
         sys.exit(1)
