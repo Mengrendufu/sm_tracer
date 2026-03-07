@@ -197,7 +197,7 @@ if(NOT WIN32)
 endif()
 
 if(WIN32)
-    target_link_libraries(${PROJECT_NAME} dwmapi)
+    target_link_libraries(${PROJECT_NAME} dwmapi winmm)
 endif()
 
 #

@@ -17,6 +17,7 @@
 
 #ifdef _WIN32
 #include "SDL_syswm.h"
+#include <timeapi.h>   /* timeBeginPeriod / timeEndPeriod */
 #endif
 
 /*==========================================================================*/
@@ -221,6 +222,10 @@ int main(int argc, char *argv[]) {
 
     if (SDL_Init(SDL_INIT_VIDEO) < 0) return -1;
 
+#ifdef _WIN32
+    timeBeginPeriod(1);
+#endif
+
     SDL_SetHint(SDL_HINT_RENDER_DRIVER, "opengl");
 
     l_window = SDL_CreateWindow(
@@ -230,8 +235,19 @@ int main(int argc, char *argv[]) {
                     SDL_WINDOW_SHOWN | SDL_WINDOW_RESIZABLE | SDL_WINDOW_OPENGL);
     if (!l_window) return -1;
 
-    l_renderer = SDL_CreateRenderer(l_window, -1, SDL_RENDERER_ACCELERATED);
+    l_renderer = SDL_CreateRenderer(l_window, -1,
+                                    SDL_RENDERER_ACCELERATED |
+                                    SDL_RENDERER_PRESENTVSYNC);
     if (!l_renderer) return -1;
+
+    {
+        SDL_RendererInfo info;
+        if (SDL_GetRendererInfo(l_renderer, &info) == 0) {
+            fprintf(stderr, "[RENDERER] name=%s flags=0x%x\n",
+                    info.name,
+                    (unsigned)info.flags);
+        }
+    }
 
     int win_w, win_h;
     SDL_GetWindowSize(l_window, &win_w, &win_h);
@@ -272,6 +288,10 @@ int main(int argc, char *argv[]) {
 
     SDL_DestroyRenderer(l_renderer);
     SDL_DestroyWindow(l_window);
+
+#ifdef _WIN32
+    timeEndPeriod(1);
+#endif
     SDL_Quit();
 
     return 0;
