@@ -65,17 +65,17 @@ if(WIN32)
     set_target_properties(SDL2::SDL2 PROPERTIES
         IMPORTED_LOCATION  "${SDL2_LIBS_DIR}/windows/SDL2.dll"
         IMPORTED_IMPLIB    "${SDL2_LIBS_DIR}/windows/libSDL2.dll.a"
-        INTERFACE_INCLUDE_DIRECTORIES "${SDL2_LIBS_DIR}/windows/include"
+        INTERFACE_INCLUDE_DIRECTORIES "${SDL2_LIBS_DIR}/windows/include/SDL2"
     )
 elseif(APPLE)
     set_target_properties(SDL2::SDL2 PROPERTIES
         IMPORTED_LOCATION "${SDL2_LIBS_DIR}/macos/libSDL2.dylib"
-        INTERFACE_INCLUDE_DIRECTORIES "${SDL2_LIBS_DIR}/macos/include"
+        INTERFACE_INCLUDE_DIRECTORIES "${SDL2_LIBS_DIR}/macos/include/SDL2"
     )
 else()  # Linux
     set_target_properties(SDL2::SDL2 PROPERTIES
         IMPORTED_LOCATION "${SDL2_LIBS_DIR}/linux/libSDL2.so"
-        INTERFACE_INCLUDE_DIRECTORIES "${SDL2_LIBS_DIR}/linux/include"
+        INTERFACE_INCLUDE_DIRECTORIES "${SDL2_LIBS_DIR}/linux/include/SDL2"
     )
 endif()
 
