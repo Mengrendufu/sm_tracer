@@ -253,15 +253,19 @@ int main(int argc, char *argv[]) {
     l_qp_worker = SDL_CreateThread(appThread, "QP_Worker", NULL);
 
     while (l_running) {
+        uint32_t frame_start = SDL_GetTicks();
+
         SDL_Event msg;
-        if (SDL_WaitEventTimeout(&msg, RENDER_INTERVAL_MS)) {
+        while (SDL_PollEvent(&msg)) {
             SDL_WndProc(&msg);
-            SDL_Event pending;
-            while (SDL_PollEvent(&pending)) {
-                SDL_WndProc(&pending);
-            }
         }
+
         do_render_frame();
+
+        uint32_t elapsed = SDL_GetTicks() - frame_start;
+        if (elapsed < RENDER_INTERVAL_MS) {
+            SDL_Delay(RENDER_INTERVAL_MS - elapsed);
+        }
     }
 
     if (l_qp_worker) SDL_WaitThread(l_qp_worker, NULL);

@@ -47,10 +47,9 @@ static void disp_flush_cb(
         rect.y = area->y1;
         rect.w = (area->x2 - area->x1 + 1);
         rect.h = (area->y2 - area->y1 + 1);
-        /* Update SDL's texture */
         SDL_UpdateTexture(l_texture, &rect, color_p, rect.w * 4);
     }
-    lv_disp_flush_ready(disp_drv);  /* Inform LVGL's display driver */
+    lv_disp_flush_ready(disp_drv);
 }
 
 /*==========================================================================*/
