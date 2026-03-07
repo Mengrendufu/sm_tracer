@@ -318,12 +318,8 @@ static bool SNMTT_formatIsLegal(const char *fmt, int *formatNum) {
     while (*fmt) {
         if (*fmt == '%') {
             ++fmt;
-            if (*fmt != 's' && *fmt != '%') {
-                return false;
-            }
-            if (*fmt == 's') {
-                *formatNum = *formatNum + 1;
-            }
+            if (*fmt != 's' && *fmt != '%') return false;
+            if (*fmt == 's')                *formatNum = *formatNum + 1;
         }
         ++fmt;
     }
@@ -337,9 +333,8 @@ static bool SNMTT_formatIsLegal(const char *fmt, int *formatNum) {
  *
  * @param[in] root
  */
-static void SNMTT_PayloadParser_update(
-    SNMTT_PayloadParser **pldParser,
-    cJSON *root)
+static void SNMTT_PayloadParser_update(SNMTT_PayloadParser **pldParser,
+                                       cJSON *root)
 {
     /* Clear pldParser */
     SNMTT_PayloadParser_destroy(pldParser);
@@ -443,7 +438,7 @@ SNMTT_PayloadParser *SNMTT_RX_getRecID(int RecID) {
 void SNMTT_loadJSONConfig(char const * const jsonPath) {
     cJSON *root = SNMTT_getCJSONRoot(jsonPath);
     /* RECV load */
-    SNMTT_PayloadParser_update(
-        (SNMTT_PayloadParser * *)SNMTT_PayloadParser_inst, root);
-    /* TRAN load */
+    SNMTT_PayloadParser_update((SNMTT_PayloadParser * *)
+                                    SNMTT_PayloadParser_inst,
+                               root);
 }
