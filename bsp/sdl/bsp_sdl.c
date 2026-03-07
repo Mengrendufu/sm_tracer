@@ -89,15 +89,24 @@ static void win32_install_subclass(SDL_Window *window) {
 
 /*==========================================================================*/
 static void do_render_frame(void) {
-    static uint32_t last_tick = 0;
-    if (last_tick == 0) last_tick = SDL_GetTicks();
+    static uint32_t last_render = 0;
+    static uint32_t last_tick   = 0;
 
-    uint32_t now  = SDL_GetTicks();
+    uint32_t now = SDL_GetTicks();
+
+    if (last_tick == 0) {
+        last_tick   = now;
+        last_render = now;
+    }
+
     uint32_t diff = now - last_tick;
     if (diff > 0) {
         BSP_lvgl_task(diff);
         last_tick = now;
     }
+
+    if (now - last_render < RENDER_INTERVAL_MS) return;
+    last_render = now;
 
     SDL_SetRenderDrawColor(l_renderer, 0, 0, 0, 255);
     SDL_RenderClear(l_renderer);
