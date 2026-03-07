@@ -30,11 +30,6 @@ python3 build.py setup
 python3 build.py build
 ```
 
-## Windows / macOS
-
-SDL2 and libserialport prebuilt libraries for Windows and macOS are **not included** in this repo.
-See [`3rd_party/libs/README.md`](3rd_party/libs/README.md) for instructions on how to obtain and place them.
-
 ## Project Structure
 
 - `application/` — Application layer (HSM logic, UI)

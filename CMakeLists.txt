@@ -67,11 +67,6 @@ if(WIN32)
         IMPORTED_IMPLIB    "${SDL2_LIBS_DIR}/windows/libSDL2.dll.a"
         INTERFACE_INCLUDE_DIRECTORIES "${SDL2_LIBS_DIR}/windows/include/SDL2"
     )
-elseif(APPLE)
-    set_target_properties(SDL2::SDL2 PROPERTIES
-        IMPORTED_LOCATION "${SDL2_LIBS_DIR}/macos/libSDL2.dylib"
-        INTERFACE_INCLUDE_DIRECTORIES "${SDL2_LIBS_DIR}/macos/include/SDL2"
-    )
 else()  # Linux
     set_target_properties(SDL2::SDL2 PROPERTIES
         IMPORTED_LOCATION "${SDL2_LIBS_DIR}/linux/libSDL2.so"
@@ -89,11 +84,6 @@ if(WIN32)
         IMPORTED_LOCATION  "${SERIALPORT_LIBS_DIR}/windows/libserialport-0.dll"
         IMPORTED_IMPLIB    "${SERIALPORT_LIBS_DIR}/windows/libserialport.dll.a"
         INTERFACE_INCLUDE_DIRECTORIES "${SERIALPORT_LIBS_DIR}/windows/include"
-    )
-elseif(APPLE)
-    set_target_properties(serialport PROPERTIES
-        IMPORTED_LOCATION "${SERIALPORT_LIBS_DIR}/macos/libserialport.dylib"
-        INTERFACE_INCLUDE_DIRECTORIES "${SERIALPORT_LIBS_DIR}/macos/include"
     )
 else()  # Linux
     set_target_properties(serialport PROPERTIES
@@ -197,11 +187,11 @@ if(WIN32)
     )
 endif()
 
-# Linux/macOS: embed rpath so the executable finds shared libs at runtime
+# Linux: embed rpath so the executable finds shared libs at runtime
 if(NOT WIN32)
     set_target_properties(${PROJECT_NAME} PROPERTIES
         BUILD_RPATH
-            "${SDL2_LIBS_DIR}/$<IF:$<BOOL:${APPLE}>,macos,linux>;${SERIALPORT_LIBS_DIR}/$<IF:$<BOOL:${APPLE}>,macos,linux>"
+            "${SDL2_LIBS_DIR}/linux;${SERIALPORT_LIBS_DIR}/linux"
         INSTALL_RPATH_USE_LINK_PATH TRUE
     )
 endif()
