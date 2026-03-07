@@ -156,6 +156,14 @@ static int           l_panel_y      = 0;
 static int           l_panel_w      = 0;
 static int           l_panel_h      = 0;
 
+/* Font atlas texture: all 95 printable ASCII glyphs in a single row.
+ * Each glyph occupies CELL_W x CELL_H pixels.
+ * Normal colour: RGB(171,178,191). Selected colour applied via ColorMod. */
+#define ATLAS_GLYPH_COUNT (FONT_LAST - FONT_FIRST + 1)  /* 95 */
+static SDL_Texture *l_font_atlas     = NULL;
+static int          l_atlas_glyph_w  = CELL_W;
+static int          l_atlas_glyph_h  = CELL_H;
+
 static Line          l_lines[MAX_LINES];
 static int           l_line_head    = 0;   /* index of oldest line */
 static int           l_line_count   = 0;   /* number of valid lines */
@@ -214,6 +222,44 @@ static void split_and_append_raw(const char *text) {
 }
 
 /*==========================================================================*/
+static void build_font_atlas(void) {
+    int atlas_w = ATLAS_GLYPH_COUNT * l_atlas_glyph_w;
+    int atlas_h = l_atlas_glyph_h;
+
+    l_font_atlas = SDL_CreateTexture(l_renderer,
+                                     SDL_PIXELFORMAT_RGBA8888,
+                                     SDL_TEXTUREACCESS_TARGET,
+                                     atlas_w, atlas_h);
+    if (!l_font_atlas) return;
+
+    SDL_SetTextureBlendMode(l_font_atlas, SDL_BLENDMODE_BLEND);
+    SDL_SetRenderTarget(l_renderer, l_font_atlas);
+    SDL_SetRenderDrawColor(l_renderer, 0, 0, 0, 0);
+    SDL_RenderClear(l_renderer);
+
+    SDL_SetRenderDrawColor(l_renderer, 255, 255, 255, 255);
+    for (int gi = 0; gi < ATLAS_GLYPH_COUNT; gi++) {
+        const uint8_t *bitmap = s_font6x12[gi];
+        int base_x = gi * l_atlas_glyph_w;
+        for (int row = 0; row < FONT_H; row++) {
+            uint8_t bits = bitmap[row];
+            for (int col = 0; col < FONT_W; col++) {
+                if (bits & (0x80u >> col)) {
+                    SDL_Rect dst = {
+                        base_x + col * FONT_SCALE,
+                        row    * FONT_SCALE,
+                        FONT_SCALE, FONT_SCALE
+                    };
+                    SDL_RenderFillRect(l_renderer, &dst);
+                }
+            }
+        }
+    }
+
+    SDL_SetRenderTarget(l_renderer, NULL);
+}
+
+/*==========================================================================*/
 void BSP_msgbuf_init(void *renderer, int panel_y, int panel_w, int panel_h) {
     l_renderer   = (SDL_Renderer *)renderer;
     l_panel_y    = panel_y;
@@ -225,6 +271,8 @@ void BSP_msgbuf_init(void *renderer, int panel_y, int panel_w, int panel_h) {
     l_auto_scroll = true;
     l_sel_active  = false;
     l_mouse_down  = false;
+
+    build_font_atlas();
 }
 
 /*==========================================================================*/
@@ -253,23 +301,13 @@ void BSP_msgbuf_clear(void) {
 static void draw_glyph(int px, int py, unsigned char c,
                         uint8_t r, uint8_t g, uint8_t b)
 {
-    unsigned char idx = (c >= FONT_FIRST && c <= FONT_LAST)
-                        ? (c - FONT_FIRST) : 0;
-    const uint8_t *bitmap = s_font6x12[idx];
-    SDL_SetRenderDrawColor(l_renderer, r, g, b, 255);
-    for (int row = 0; row < FONT_H; row++) {
-        uint8_t bits = bitmap[row];
-        for (int col = 0; col < FONT_W; col++) {
-            if (bits & (0x80u >> col)) {
-                SDL_Rect dst = {
-                    px + col * FONT_SCALE,
-                    py + row * FONT_SCALE,
-                    FONT_SCALE, FONT_SCALE
-                };
-                SDL_RenderFillRect(l_renderer, &dst);
-            }
-        }
-    }
+    if (!l_font_atlas) return;
+    unsigned char gi = (c >= FONT_FIRST && c <= FONT_LAST)
+                       ? (c - FONT_FIRST) : 0;
+    SDL_Rect src = { gi * l_atlas_glyph_w, 0, l_atlas_glyph_w, l_atlas_glyph_h };
+    SDL_Rect dst = { px, py, l_atlas_glyph_w, l_atlas_glyph_h };
+    SDL_SetTextureColorMod(l_font_atlas, r, g, b);
+    SDL_RenderCopy(l_renderer, l_font_atlas, &src, &dst);
 }
 
 /*==========================================================================*/
