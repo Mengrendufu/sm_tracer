@@ -44,7 +44,13 @@ void BSP_lvgl_render(void);
  *
  * @param[in] dt_ms Tick passing.
  */
-void BSP_lvgl_task(uint32_t dt_ms);
+uint32_t BSP_lvgl_task(uint32_t dt_ms);
+
+/*==========================================================================*/
+/**
+ * @brief Returns true (and clears the flag) if LVGL flushed pixels since last call.
+ */
+bool BSP_lvgl_is_dirty(void);
 
 /*==========================================================================*/
 /**

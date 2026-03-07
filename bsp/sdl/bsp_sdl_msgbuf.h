@@ -47,6 +47,12 @@ void BSP_msgbuf_clear(void);
 
 /*==========================================================================*/
 /**
+ * @brief Returns true if the panel cache needs repainting (without consuming the flag).
+ */
+bool BSP_msgbuf_is_dirty(void);
+
+/*==========================================================================*/
+/**
  * @brief Render the message buffer panel into the SDL renderer.
  *        Must be called between SDL_RenderClear and SDL_RenderPresent.
  */

@@ -21,6 +21,10 @@ static SDL_Texture  *l_texture      = NULL;
 static SDL_Renderer *l_renderer_ref = NULL;
 
 /*==========================================================================*/
+/* ...Dirty flag: set by disp_flush_cb whenever LVGL actually flushes pixels. */
+static bool l_lvgl_dirty = false;
+
+/*==========================================================================*/
 /* ...LVGL draw buffer. */
 #define DISP_BUF_SIZE (2650U * 1440U)  /* 2K */
 static lv_color_t l_disp_buf_mem[DISP_BUF_SIZE];
@@ -49,6 +53,7 @@ static void disp_flush_cb(
         rect.h = (area->y2 - area->y1 + 1);
         SDL_UpdateTexture(l_texture, &rect, color_p, rect.w * 4);
     }
+    l_lvgl_dirty = true;
     lv_disp_flush_ready(disp_drv);
 }
 
@@ -90,9 +95,15 @@ void BSP_lvgl_init(const BSP_lvgl_cfg_t *cfg) {
     lv_port_indev_init_internal();
 }
 /*..........................................................................*/
-void BSP_lvgl_task(uint32_t dt_ms) {
+bool BSP_lvgl_is_dirty(void) {
+    bool d = l_lvgl_dirty;
+    l_lvgl_dirty = false;
+    return d;
+}
+/*..........................................................................*/
+uint32_t BSP_lvgl_task(uint32_t dt_ms) {
     lv_tick_inc(dt_ms);
-    lv_timer_handler();
+    return lv_timer_handler();
 }
 /*..........................................................................*/
 void BSP_lvgl_render(void) {

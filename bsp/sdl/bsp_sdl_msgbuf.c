@@ -427,6 +427,11 @@ static void draw_banner_to_cache(void) {
 }
 
 /*==========================================================================*/
+bool BSP_msgbuf_is_dirty(void) {
+    return l_cache_dirty;
+}
+
+/*==========================================================================*/
 void BSP_msgbuf_render(void) {
     if (!l_renderer) return;
     if (!l_panel_cache) return;
