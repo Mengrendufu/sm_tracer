@@ -31,7 +31,7 @@ static SDL_Thread *l_qp_worker = NULL;
 
 /*==========================================================================*/
 static void SDL_WndProc(SDL_Event *e);
-static void do_render_frame(void);
+static bool do_render_frame(void);
 
 #ifdef _WIN32
 #define MODAL_TIMER_ID 1
@@ -89,7 +89,7 @@ static void win32_install_subclass(SDL_Window *window) {
 #endif /* _WIN32 */
 
 /*==========================================================================*/
-static void do_render_frame(void) {
+static bool do_render_frame(void) {
     static uint32_t last_render = 0;
     static uint32_t last_tick   = 0;
 
@@ -100,7 +100,7 @@ static void do_render_frame(void) {
         last_render = now;
     }
 
-    if (now - last_render < RENDER_INTERVAL_MS) return;
+    if (now - last_render < RENDER_INTERVAL_MS) return false;
 
     uint32_t diff = now - last_tick;
     if (diff > 0) {
@@ -112,13 +112,14 @@ static void do_render_frame(void) {
     bool lvgl_dirty   = BSP_lvgl_is_dirty();
     bool msgbuf_dirty = BSP_msgbuf_is_dirty();
 
-    if (!lvgl_dirty && !msgbuf_dirty) return;
+    if (!lvgl_dirty && !msgbuf_dirty) return false;
 
     SDL_SetRenderDrawColor(l_renderer, 0, 0, 0, 255);
     SDL_RenderClear(l_renderer);
     BSP_lvgl_render();
     BSP_msgbuf_render();
     SDL_RenderPresent(l_renderer);
+    return true;
 }
 
 /*==========================================================================*/
@@ -231,7 +232,13 @@ int main(int argc, char *argv[]) {
     timeBeginPeriod(1);
 #endif
 
+#ifndef _WIN32
+    /* On Linux/macOS, prefer OpenGL for reliable driver support.
+     * On Windows, let SDL pick D3D11 so PRESENTVSYNC uses the DXGI flip
+     * model (genuinely blocking) instead of OpenGL wglSwapBuffers which
+     * can busy-wait depending on the GPU driver. */
     SDL_SetHint(SDL_HINT_RENDER_DRIVER, "opengl");
+#endif
 
     l_window = SDL_CreateWindow(
                     "SM_Tracer",
@@ -281,11 +288,13 @@ int main(int argc, char *argv[]) {
             SDL_WndProc(&msg);
         }
 
-        do_render_frame();
+        bool rendered = do_render_frame();
 
-        uint32_t elapsed = SDL_GetTicks() - frame_start;
-        if (elapsed < RENDER_INTERVAL_MS) {
-            SDL_Delay(RENDER_INTERVAL_MS - elapsed);
+        if (!rendered) {
+            uint32_t elapsed = SDL_GetTicks() - frame_start;
+            if (elapsed < RENDER_INTERVAL_MS) {
+                SDL_Delay(RENDER_INTERVAL_MS - elapsed);
+            }
         }
     }
 
