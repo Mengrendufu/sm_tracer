@@ -12,6 +12,13 @@
 #include "bsp.h"
 #include "application.h"
 
+#ifdef _WIN32
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
+#include <windows.h>
+#endif
+
 /*==========================================================================*/
 SM_DEFINE_MODULE("bsp_spt")
 
@@ -29,8 +36,13 @@ typedef struct {
     int nFree;
     int nMin;
 
+#ifdef _WIN32
+    CRITICAL_SECTION lock;
+    HANDLE           sem_handle;
+#else
     SDL_mutex *lock;
     SDL_sem   *sem_handle;
+#endif
 } PtrQueue;
 
 /* Thread queue instance. */
@@ -46,13 +58,23 @@ static void _q_init(void) {
     lspThreadQueue.nMin  = PTR_QUEUE_SIZE;
 
     /* OS thread configurations... */
-    lspThreadQueue.lock       = SDL_CreateMutex();   /* Lock init. */
-    lspThreadQueue.sem_handle = SDL_CreateSemaphore(0); /* Semaphore. */
+#ifdef _WIN32
+    InitializeCriticalSection(&lspThreadQueue.lock);
+    lspThreadQueue.sem_handle =
+                            CreateSemaphore(NULL, 0, PTR_QUEUE_SIZE, NULL);
+#else
+    lspThreadQueue.lock       = SDL_CreateMutex();
+    lspThreadQueue.sem_handle = SDL_CreateSemaphore(0);
+#endif
 }
 /*..........................................................................*/
 static bool _q_push(SpThreadEvt* ptr) {
     bool ret = false;
+#ifdef _WIN32
+    EnterCriticalSection(&lspThreadQueue.lock);
+#else
     SDL_LockMutex(lspThreadQueue.lock);
+#endif
 
     if (lspThreadQueue.nFree > 0) {
         lspThreadQueue.buffer[lspThreadQueue.head] = ptr;
@@ -68,9 +90,17 @@ static bool _q_push(SpThreadEvt* ptr) {
         ret = true;
     }
 
+#ifdef _WIN32
+    LeaveCriticalSection(&lspThreadQueue.lock);
+#else
     SDL_UnlockMutex(lspThreadQueue.lock);
+#endif
 
+#ifdef _WIN32
+    if (ret) ReleaseSemaphore(lspThreadQueue.sem_handle, 1, NULL);
+#else
     if (ret) SDL_SemPost(lspThreadQueue.sem_handle);
+#endif
     else     free(ptr);
 
     return ret;
@@ -79,7 +109,11 @@ static bool _q_push(SpThreadEvt* ptr) {
 static SpThreadEvt *_q_pop(void) {
     SpThreadEvt *ptr = NULL;
 
+#ifdef _WIN32
+    EnterCriticalSection(&lspThreadQueue.lock);
+#else
     SDL_LockMutex(lspThreadQueue.lock);
+#endif
 
     if (lspThreadQueue.nUsed > 0) {
         ptr = lspThreadQueue.buffer[lspThreadQueue.tail];
@@ -90,7 +124,11 @@ static SpThreadEvt *_q_pop(void) {
         ++lspThreadQueue.nFree;
     }
 
+#ifdef _WIN32
+    LeaveCriticalSection(&lspThreadQueue.lock);
+#else
     SDL_UnlockMutex(lspThreadQueue.lock);
+#endif
 
     return ptr;
 }
@@ -156,7 +194,11 @@ typedef struct {
     uint8_t rxBuf[SERIAL_RX_BUF_SIZE];
     size_t rxCnt;
     /* Time gap, for packet idle. */
+#ifdef _WIN32
+    DWORD latestRxTimeMark;
+#else
     Uint32 latestRxTimeMark;
+#endif
 } ReceivePackage;
 
 /* Instance. */
@@ -442,11 +484,19 @@ static void SpTrd_resetRwWorking(void) {
 
 /*==========================================================================*/
 /* ===SerialPort thread entrance. */
+#ifdef _WIN32
+DWORD WINAPI serialThread(LPVOID lpParam) {
+    (void)lpParam;
+
+    /* SpThread priority. */
+    SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_ABOVE_NORMAL);
+#else
 int SDLCALL serialThread(void *lpParam) {
     (void)lpParam;
 
     /* SpThread priority. */
     SDL_SetThreadPriority(SDL_THREAD_PRIORITY_HIGH);
+#endif
 
     /* Super loop.... */
     for (;;) {
@@ -459,7 +509,12 @@ int SDLCALL serialThread(void *lpParam) {
 
             /* Thread SM event dispatching... */
             while (
+#ifdef _WIN32
+                WaitForSingleObject(lspThreadQueue.sem_handle, 0) ==
+                                                                WAIT_OBJECT_0
+#else
                 SDL_SemTryWait(lspThreadQueue.sem_handle) == 0
+#endif
             ) {
                 ThreadEvt_dispatch();
             }
@@ -468,7 +523,11 @@ int SDLCALL serialThread(void *lpParam) {
             /* ...Serial port is disconnected; block until next command. */
 
             /* Waiting for events coming... */
+#ifdef _WIN32
+            WaitForSingleObject(lspThreadQueue.sem_handle, INFINITE);
+#else
             SDL_SemWait(lspThreadQueue.sem_handle);
+#endif
 
             /* Evt processing... */
             ThreadEvt_dispatch();
@@ -484,8 +543,13 @@ static bool SerialPortThread_rxTask_packetCntOverflow(ReceivePackage *pkg) {
 }
 /*..........................................................................*/
 static bool SerialPortThread_rxTask_packetTimeout(ReceivePackage *pkg) {
+#ifdef _WIN32
+    return ((GetTickCount() - pkg->latestRxTimeMark >= SERIAL_RX_PACKET_IDLE)
+                && (pkg->rxCnt != 0));
+#else
     return ((SDL_GetTicks() - pkg->latestRxTimeMark >= SERIAL_RX_PACKET_IDLE)
                 && (pkg->rxCnt != 0));
+#endif
 }
 /*..........................................................................*/
 static void SerialPortThread_rxTask_packReset(ReceivePackage *pkg) {
@@ -522,7 +586,11 @@ static void SerialPortThread_rxTask(ReceivePackage *pkg) {
         /* ...Bytes input. */
 
         /* Update time mark. */
+#ifdef _WIN32
+        pkg->latestRxTimeMark = GetTickCount();
+#else
         pkg->latestRxTimeMark = SDL_GetTicks();
+#endif
 
         /* Update received length. */
         pkg->rxCnt += byteReadCnt;
@@ -555,5 +623,9 @@ static void SerialPortThread_rxTask(ReceivePackage *pkg) {
 void BSP_Serial_Init(void) {
     _q_init();  /* Thread event queue init. */
     SP_Task_ctor();
+#ifdef _WIN32
+    CreateThread(NULL, 0, serialThread, NULL, 0, NULL);
+#else
     SDL_CreateThread(serialThread, "SerialPort", NULL);
+#endif
 }

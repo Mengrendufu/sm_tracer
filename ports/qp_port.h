@@ -72,7 +72,7 @@
 #define QACTIVE_OS_OBJ_TYPE  void*
 #define QACTIVE_THREAD_TYPE  void*
 
-// QF critical section for Win32, see NOTE1
+// QF critical section, see NOTE1
 #define QF_CRIT_STAT
 #define QF_CRIT_ENTRY()      QF_enterCriticalSection_()
 #define QF_CRIT_EXIT()       QF_leaveCriticalSection_()
@@ -104,8 +104,8 @@ void QF_onClockTick(void);
 #endif
 
 // include files -------------------------------------------------------------
-#include "qequeue.h"   // Win32 port needs the native event-queue
-#include "qmpool.h"    // Win32 port needs the native memory-pool
+#include "qequeue.h"   // native event-queue
+#include "qmpool.h"    // native memory-pool
 #include "qp.h"        // QP platform-independent public interface
 
 #ifdef _MSC_VER
@@ -122,12 +122,40 @@ void QF_onClockTick(void);
 #define QF_SCHED_LOCK_(dummy) ((void)0)
 #define QF_SCHED_UNLOCK_()    ((void)0)
 
-#include <SDL.h>  // SDL2 types needed for macros below
+#ifdef _WIN32
+// ---------------------------------------------------------------------------
+// Win32 port: native CRITICAL_SECTION + Win32 Event objects
 
-// global critical-section mutex defined in qf_port.c
+// Minimum required Windows version is Windows-XP or newer (0x0501)
+#ifdef WINVER
+#undef WINVER
+#endif
+#ifdef _WIN32_WINNT
+#undef _WIN32_WINNT
+#endif
+
+#define WINVER _WIN32_WINNT_WINXP
+#define _WIN32_WINNT _WIN32_WINNT_WINXP
+
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h> // Win32 API
+
+#define QACTIVE_EQUEUE_WAIT_(me_) \
+    while ((me_)->eQueue.frontEvt == (QEvt *)0) { \
+        QF_CRIT_EXIT(); \
+        (void)WaitForSingleObject((me_)->osObject, (DWORD)INFINITE); \
+        QF_CRIT_ENTRY(); \
+    }
+
+#define QACTIVE_EQUEUE_SIGNAL_(me_) \
+    (void)SetEvent((me_)->osObject)
+
+#else // !_WIN32 — SDL2 port for Linux / macOS
+// ---------------------------------------------------------------------------
+#include <SDL.h>
+
 extern SDL_mutex *l_sdlCritMutex;
 
-// QF event queue customization for SDL2
 #define QACTIVE_EQUEUE_WAIT_(me_) \
     while ((me_)->eQueue.frontEvt == (QEvt *)0) { \
         QF_CRIT_EXIT(); \
@@ -138,7 +166,9 @@ extern SDL_mutex *l_sdlCritMutex;
 #define QACTIVE_EQUEUE_SIGNAL_(me_) \
     SDL_CondSignal((SDL_cond *)(me_)->osObject)
 
-// QMPool operations
+#endif // _WIN32
+
+// QMPool operations (shared)
 #define QF_EPOOL_TYPE_  QMPool
 #define QF_EPOOL_INIT_(p_, poolSto_, poolSize_, evtSize_) \
             (QMPool_init(&(p_), (poolSto_), (poolSize_), (evtSize_)))
@@ -155,16 +185,15 @@ extern SDL_mutex *l_sdlCritMutex;
 //============================================================================
 // NOTE1:
 // QP, like all real-time frameworks, needs to execute certain sections of
-// code exclusively — only one thread at a time. Such sections are called
-// "critical sections".
+// code exclusively, meaning that only one thread can execute the code at
+// the time. Such sections of code are called "critical sections".
 //
-// This SDL2 port uses a pair of functions QF_enterCriticalSection_() /
-// QF_leaveCriticalSection_() implemented in qf_port.c. They protect all
-// critical sections using a single SDL_mutex (l_sdlCritMutex). The mutex
-// is non-recursive; re-entry is explicitly forbidden and caught by an
-// assertion (Q_ASSERT_INCRIT). Using one mutex for all critical sections
-// guarantees that only one thread at a time is inside a critical section,
-// preventing race conditions and data corruption.
+// This port uses a pair of functions QF_enterCriticalSection_() /
+// QF_leaveCriticalSection_() to enter/leave the critical section,
+// respectively.
+//
+// On Windows, these functions use a Win32 CRITICAL_SECTION object.
+// On other platforms, they use an SDL_mutex.
 //
 // NOTE2:
 // Scheduler locking (used inside QActive_publish_()) is NOT implemented
