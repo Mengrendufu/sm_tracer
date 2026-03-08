@@ -94,9 +94,10 @@ static bool do_render_frame(void) {
     static uint32_t last_tick   = 0;
 
     /* Diagnostics: count rendered vs skipped frames per second. */
-    static uint32_t diag_last   = 0;
+    static uint32_t diag_last     = 0;
     static uint32_t diag_rendered = 0;
     static uint32_t diag_skipped  = 0;
+    static uint64_t diag_lvgl_us  = 0;
 
     uint32_t now = SDL_GetTicks();
 
@@ -108,10 +109,11 @@ static bool do_render_frame(void) {
 
     if (diag_last == 0) diag_last = now;
     if (now - diag_last >= 1000) {
-        fprintf(stderr, "[RENDER] rendered=%u skipped=%u per sec\n",
-                diag_rendered, diag_skipped);
+        fprintf(stderr, "[RENDER] rendered=%u skipped=%u lvgl_us=%llu per sec\n",
+                diag_rendered, diag_skipped, (unsigned long long)diag_lvgl_us);
         diag_rendered = 0;
         diag_skipped  = 0;
+        diag_lvgl_us  = 0;
         diag_last     = now;
     }
 
@@ -119,7 +121,10 @@ static bool do_render_frame(void) {
 
     uint32_t diff = now - last_tick;
     if (diff > 0) {
+        uint64_t t0 = SDL_GetPerformanceCounter();
         BSP_lvgl_task(diff);
+        uint64_t freq = SDL_GetPerformanceFrequency();
+        diag_lvgl_us += (SDL_GetPerformanceCounter() - t0) * 1000000ULL / freq;
         last_tick = now;
     }
     last_render = now;
