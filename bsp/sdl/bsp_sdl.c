@@ -31,7 +31,7 @@ static SDL_Thread *l_qp_worker = NULL;
 
 /*==========================================================================*/
 static void SDL_WndProc(SDL_Event *e);
-static bool do_render_frame(void);
+static void do_render_frame(void);
 
 #ifdef _WIN32
 #define MODAL_TIMER_ID 1
@@ -89,7 +89,7 @@ static void win32_install_subclass(SDL_Window *window) {
 #endif /* _WIN32 */
 
 /*==========================================================================*/
-static bool do_render_frame(void) {
+static void do_render_frame(void) {
     static uint32_t last_render = 0;
     static uint32_t last_tick   = 0;
 
@@ -100,7 +100,7 @@ static bool do_render_frame(void) {
         last_render = now;
     }
 
-    if (now - last_render < RENDER_INTERVAL_MS) return false;
+    if (now - last_render < RENDER_INTERVAL_MS) return;
 
     uint32_t diff = now - last_tick;
     if (diff > 0) {
@@ -116,7 +116,7 @@ static bool do_render_frame(void) {
     bool msgbuf_dirty = false;
 #endif
 
-    if (!lvgl_dirty && !msgbuf_dirty) return false;
+    if (!lvgl_dirty && !msgbuf_dirty) return;
 
     SDL_SetRenderDrawColor(l_renderer, 0, 0, 0, 255);
     SDL_RenderClear(l_renderer);
@@ -125,7 +125,6 @@ static bool do_render_frame(void) {
     BSP_msgbuf_render();
 #endif
     SDL_RenderPresent(l_renderer);
-    return true;
 }
 
 /*==========================================================================*/
@@ -247,14 +246,10 @@ int main(int argc, char *argv[]) {
     if (SDL_Init(SDL_INIT_VIDEO) < 0) return -1;
 
 #ifdef _WIN32
-    // timeBeginPeriod(1);
+    timeBeginPeriod(1);
 #endif
 
 #ifndef _WIN32
-    /* On Linux/macOS, prefer OpenGL for reliable driver support.
-     * On Windows, let SDL pick D3D11 so PRESENTVSYNC uses the DXGI flip
-     * model (genuinely blocking) instead of OpenGL wglSwapBuffers which
-     * can busy-wait depending on the GPU driver. */
     SDL_SetHint(SDL_HINT_RENDER_DRIVER, "opengl");
 #endif
 
@@ -263,10 +258,6 @@ int main(int argc, char *argv[]) {
                     SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
                     LVGL_WIND_WIDTH, LVGL_WIND_HEIGHT + MSGBUF_PANEL_HEIGHT,
 #ifdef _WIN32
-                    /* On Windows, do NOT force SDL_WINDOW_OPENGL — let SDL pick
-                     * D3D11 so PRESENTVSYNC uses the DXGI flip model (genuinely
-                     * blocking) instead of wglSwapBuffers which busy-waits on
-                     * many GPU drivers and causes ~18-25% idle CPU. */
                     SDL_WINDOW_SHOWN | SDL_WINDOW_RESIZABLE
 #else
                     SDL_WINDOW_SHOWN | SDL_WINDOW_RESIZABLE | SDL_WINDOW_OPENGL
@@ -274,19 +265,8 @@ int main(int argc, char *argv[]) {
                     );
     if (!l_window) return -1;
 
-    l_renderer = SDL_CreateRenderer(l_window, -1,
-                                    SDL_RENDERER_ACCELERATED |
-                                    SDL_RENDERER_PRESENTVSYNC);
+    l_renderer = SDL_CreateRenderer(l_window, -1, SDL_RENDERER_ACCELERATED);
     if (!l_renderer) return -1;
-
-    {
-        SDL_RendererInfo info;
-        if (SDL_GetRendererInfo(l_renderer, &info) == 0) {
-            fprintf(stderr, "[RENDERER] name=%s flags=0x%x\n",
-                    info.name,
-                    (unsigned)info.flags);
-        }
-    }
 
     int win_w, win_h;
     SDL_GetWindowSize(l_window, &win_w, &win_h);
@@ -310,21 +290,15 @@ int main(int argc, char *argv[]) {
     l_qp_worker = SDL_CreateThread(appThread, "QP_Worker", NULL);
 
     while (l_running) {
-        uint32_t frame_start = SDL_GetTicks();
-
         SDL_Event msg;
-        while (SDL_PollEvent(&msg)) {
+        if (SDL_WaitEventTimeout(&msg, 5)) {
             SDL_WndProc(&msg);
-        }
-
-        bool rendered = do_render_frame();
-
-        if (!rendered) {
-            uint32_t elapsed = SDL_GetTicks() - frame_start;
-            if (elapsed < RENDER_INTERVAL_MS) {
-                SDL_Delay(RENDER_INTERVAL_MS - elapsed);
+            while (SDL_PollEvent(&msg)) {
+                SDL_WndProc(&msg);
             }
         }
+
+        do_render_frame();
     }
 
     if (l_qp_worker) SDL_WaitThread(l_qp_worker, NULL);
@@ -333,7 +307,7 @@ int main(int argc, char *argv[]) {
     SDL_DestroyWindow(l_window);
 
 #ifdef _WIN32
-    // timeEndPeriod(1);
+    timeEndPeriod(1);
 #endif
     SDL_Quit();
 
