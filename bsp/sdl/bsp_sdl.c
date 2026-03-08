@@ -93,11 +93,26 @@ static bool do_render_frame(void) {
     static uint32_t last_render = 0;
     static uint32_t last_tick   = 0;
 
+    /* Diagnostics: count rendered vs skipped frames per second. */
+    static uint32_t diag_last   = 0;
+    static uint32_t diag_rendered = 0;
+    static uint32_t diag_skipped  = 0;
+
     uint32_t now = SDL_GetTicks();
 
     if (last_tick == 0) {
         last_tick   = now;
         last_render = now;
+        diag_last   = now;
+    }
+
+    if (diag_last == 0) diag_last = now;
+    if (now - diag_last >= 1000) {
+        fprintf(stderr, "[RENDER] rendered=%u skipped=%u per sec\n",
+                diag_rendered, diag_skipped);
+        diag_rendered = 0;
+        diag_skipped  = 0;
+        diag_last     = now;
     }
 
     if (now - last_render < RENDER_INTERVAL_MS) return false;
@@ -112,13 +127,17 @@ static bool do_render_frame(void) {
     bool lvgl_dirty   = BSP_lvgl_is_dirty();
     bool msgbuf_dirty = BSP_msgbuf_is_dirty();
 
-    if (!lvgl_dirty && !msgbuf_dirty) return false;
+    if (!lvgl_dirty && !msgbuf_dirty) {
+        diag_skipped++;
+        return false;
+    }
 
     SDL_SetRenderDrawColor(l_renderer, 0, 0, 0, 255);
     SDL_RenderClear(l_renderer);
     BSP_lvgl_render();
     BSP_msgbuf_render();
     SDL_RenderPresent(l_renderer);
+    diag_rendered++;
     return true;
 }
 
