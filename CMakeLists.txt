@@ -165,6 +165,7 @@ set(ALL_SOURCES
 # WIN32: no console generated.
 # add_executable(${PROJECT_NAME} WIN32 ${ALL_SOURCES})
 add_executable(${PROJECT_NAME} ${ALL_SOURCES})
+target_compile_definitions(${PROJECT_NAME} PRIVATE TEST_NO_MSGBUF)
 
 #
 # linking libraries ==========================================================

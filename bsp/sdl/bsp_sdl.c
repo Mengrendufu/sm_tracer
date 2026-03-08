@@ -93,56 +93,38 @@ static bool do_render_frame(void) {
     static uint32_t last_render = 0;
     static uint32_t last_tick   = 0;
 
-    /* Diagnostics: count rendered vs skipped frames per second. */
-    static uint32_t diag_last     = 0;
-    static uint32_t diag_rendered = 0;
-    static uint32_t diag_skipped  = 0;
-    static uint64_t diag_lvgl_us  = 0;
-
     uint32_t now = SDL_GetTicks();
 
     if (last_tick == 0) {
         last_tick   = now;
         last_render = now;
-        diag_last   = now;
-    }
-
-    if (diag_last == 0) diag_last = now;
-    if (now - diag_last >= 1000) {
-        fprintf(stderr, "[RENDER] rendered=%u skipped=%u lvgl_us=%llu per sec\n",
-                diag_rendered, diag_skipped, (unsigned long long)diag_lvgl_us);
-        diag_rendered = 0;
-        diag_skipped  = 0;
-        diag_lvgl_us  = 0;
-        diag_last     = now;
     }
 
     if (now - last_render < RENDER_INTERVAL_MS) return false;
 
     uint32_t diff = now - last_tick;
     if (diff > 0) {
-        uint64_t t0 = SDL_GetPerformanceCounter();
         BSP_lvgl_task(diff);
-        uint64_t freq = SDL_GetPerformanceFrequency();
-        diag_lvgl_us += (SDL_GetPerformanceCounter() - t0) * 1000000ULL / freq;
         last_tick = now;
     }
     last_render = now;
 
     bool lvgl_dirty   = BSP_lvgl_is_dirty();
+#ifndef TEST_NO_MSGBUF
     bool msgbuf_dirty = BSP_msgbuf_is_dirty();
+#else
+    bool msgbuf_dirty = false;
+#endif
 
-    if (!lvgl_dirty && !msgbuf_dirty) {
-        diag_skipped++;
-        return false;
-    }
+    if (!lvgl_dirty && !msgbuf_dirty) return false;
 
     SDL_SetRenderDrawColor(l_renderer, 0, 0, 0, 255);
     SDL_RenderClear(l_renderer);
     BSP_lvgl_render();
+#ifndef TEST_NO_MSGBUF
     BSP_msgbuf_render();
+#endif
     SDL_RenderPresent(l_renderer);
-    diag_rendered++;
     return true;
 }
 
@@ -167,7 +149,9 @@ static void SDL_WndProc(SDL_Event *e) {
                 case SDL_WINDOWEVENT_RESIZED:
                 case SDL_WINDOWEVENT_SIZE_CHANGED: {
                     BSP_lvgl_resize(e->window.data1, e->window.data2);
+#ifndef TEST_NO_MSGBUF
                     BSP_msgbuf_resize(e->window.data1, e->window.data2);
+#endif
                     break;
                 }
                 default: break;
@@ -179,35 +163,45 @@ static void SDL_WndProc(SDL_Event *e) {
             BSP_lvgl_feed_mouse(
                 e->motion.x, e->motion.y,
                 (e->motion.state & SDL_BUTTON_LMASK));
+#ifndef TEST_NO_MSGBUF
             BSP_msgbuf_mouse_motion(
                 e->motion.x, e->motion.y,
                 (e->motion.state & SDL_BUTTON_LMASK));
+#endif
             break;
         }
         case SDL_MOUSEBUTTONDOWN: {
             if (e->button.button == SDL_BUTTON_LEFT) {
                 BSP_lvgl_feed_mouse(e->button.x, e->button.y, true);
+#ifndef TEST_NO_MSGBUF
                 BSP_msgbuf_mouse_button(e->button.x, e->button.y, true);
+#endif
             }
             break;
         }
         case SDL_MOUSEBUTTONUP: {
             if (e->button.button == SDL_BUTTON_LEFT) {
                 BSP_lvgl_feed_mouse(e->button.x, e->button.y, false);
+#ifndef TEST_NO_MSGBUF
                 BSP_msgbuf_mouse_button(e->button.x, e->button.y, false);
+#endif
             }
             break;
         }
 
         case SDL_MOUSEWHEEL: {
+#ifndef TEST_NO_MSGBUF
             BSP_msgbuf_mouse_wheel(e->wheel.y);
+#endif
             break;
         }
 
         case SDL_KEYDOWN: {
             if ((e->key.keysym.sym == SDLK_c)
                     && (e->key.keysym.mod & KMOD_CTRL)) {
+#ifndef TEST_NO_MSGBUF
                 BSP_msgbuf_copy_selection();
+#endif
             }
             break;
         }
@@ -303,7 +297,9 @@ int main(int argc, char *argv[]) {
         .screen_height = LVGL_WIND_HEIGHT
     };
     BSP_lvgl_init(&lvgl_cfg);
+#ifndef TEST_NO_MSGBUF
     BSP_msgbuf_init(l_renderer, LVGL_WIND_HEIGHT, win_w, MSGBUF_PANEL_HEIGHT);
+#endif
 
     GUI_init();
 
