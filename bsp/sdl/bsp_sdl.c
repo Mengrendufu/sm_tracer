@@ -247,7 +247,7 @@ int main(int argc, char *argv[]) {
     if (SDL_Init(SDL_INIT_VIDEO) < 0) return -1;
 
 #ifdef _WIN32
-    timeBeginPeriod(1);
+    // timeBeginPeriod(1);
 #endif
 
 #ifndef _WIN32
@@ -333,7 +333,7 @@ int main(int argc, char *argv[]) {
     SDL_DestroyWindow(l_window);
 
 #ifdef _WIN32
-    timeEndPeriod(1);
+    // timeEndPeriod(1);
 #endif
     SDL_Quit();
 
