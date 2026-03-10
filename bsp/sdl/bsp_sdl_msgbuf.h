@@ -17,7 +17,7 @@
 
 /*==========================================================================*/
 /* ...Pixel height of the SDL message buffer panel (below LVGL). */
-#define MSGBUF_PANEL_HEIGHT  362
+#define MSGBUF_PANEL_HEIGHT  633
 
 /*==========================================================================*/
 /**

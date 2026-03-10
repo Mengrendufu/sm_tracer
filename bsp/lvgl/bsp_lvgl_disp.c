@@ -139,4 +139,3 @@ void BSP_lvgl_resize(int width, int height) {
     }
     lv_refr_now(NULL);  /* Refresh now. */
 }
-

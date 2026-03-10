@@ -126,8 +126,11 @@ static const uint8_t s_font6x12[][FONT_H] = {
 /*==========================================================================*/
 /* ...Font and layout constants. */
 #define FONT_SCALE   2
-#define CELL_W       (FONT_W * FONT_SCALE)
-#define CELL_H       (FONT_H * FONT_SCALE)
+#define ATLAS_CELL_W (FONT_W * FONT_SCALE)
+#define ATLAS_CELL_H (FONT_H * FONT_SCALE)
+#define CELL_W       12
+#define CELL_H       26
+#define CELL_ADV_W   15
 #define LINE_H       (CELL_H + 3)
 #define PAD_X        12
 #define PAD_Y        8
@@ -156,13 +159,10 @@ static int           l_panel_y      = 0;
 static int           l_panel_w      = 0;
 static int           l_panel_h      = 0;
 
-/* Font atlas texture: all 95 printable ASCII glyphs in a single row.
- * Each glyph occupies CELL_W x CELL_H pixels.
- * Normal colour: RGB(171,178,191). Selected colour applied via ColorMod. */
 #define ATLAS_GLYPH_COUNT (FONT_LAST - FONT_FIRST + 1)  /* 95 */
 static SDL_Texture *l_font_atlas     = NULL;
-static int          l_atlas_glyph_w  = CELL_W;
-static int          l_atlas_glyph_h  = CELL_H;
+static int          l_atlas_glyph_w  = ATLAS_CELL_W;
+static int          l_atlas_glyph_h  = ATLAS_CELL_H;
 
 static Line          l_lines[MAX_LINES];
 static int           l_line_head    = 0;   /* index of oldest line */
@@ -325,7 +325,7 @@ static void draw_glyph(int px, int py, unsigned char c,
     unsigned char gi = (c >= FONT_FIRST && c <= FONT_LAST)
                        ? (c - FONT_FIRST) : 0;
     SDL_Rect src = { gi * l_atlas_glyph_w, 0, l_atlas_glyph_w, l_atlas_glyph_h };
-    SDL_Rect dst = { px, py, l_atlas_glyph_w, l_atlas_glyph_h };
+    SDL_Rect dst = { px, py, CELL_W, CELL_H };
     SDL_SetTextureColorMod(l_font_atlas, r, g, b);
     SDL_RenderCopy(l_renderer, l_font_atlas, &src, &dst);
 }
@@ -449,7 +449,7 @@ void BSP_msgbuf_render(void) {
 
         int rows     = visible_rows();
         int total    = buf_line_count();
-        int max_cols = text_area_w() / CELL_W;
+        int max_cols = text_area_w() / CELL_ADV_W;
 
         if (total == 0) {
             draw_banner_to_cache();
@@ -460,9 +460,9 @@ void BSP_msgbuf_render(void) {
                 Line *ln = buf_line_at(line_idx);
                 int py = PAD_Y + r * LINE_H;
                 for (int c = 0; c < ln->len && c < max_cols; c++) {
-                    int px = PAD_X + c * CELL_W;
+                    int px = PAD_X + c * CELL_ADV_W;
                     if (char_in_selection(line_idx, c)) {
-                        SDL_Rect sel_rect = { px, py, CELL_W, CELL_H };
+                        SDL_Rect sel_rect = { px, py, CELL_ADV_W, CELL_H };
                         SDL_SetRenderDrawColor(l_renderer, 62, 68, 81, 255);
                         SDL_RenderFillRect(l_renderer, &sel_rect);
                         draw_glyph(px, py, (unsigned char)ln->text[c], 229, 229, 229);
@@ -484,7 +484,7 @@ void BSP_msgbuf_render(void) {
 
 /*==========================================================================*/
 static int pixel_to_col(int px) {
-    int col = (px - PAD_X) / CELL_W;
+    int col = (px - PAD_X) / CELL_ADV_W;
     return (col < 0) ? 0 : col;
 }
 

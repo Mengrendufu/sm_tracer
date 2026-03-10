@@ -163,8 +163,11 @@ set(ALL_SOURCES
 #
 # Executable rules ===========================================================
 # WIN32: no console generated.
-# add_executable(${PROJECT_NAME} WIN32 ${ALL_SOURCES})
-add_executable(${PROJECT_NAME} ${ALL_SOURCES})
+if(WIN32)
+    add_executable(${PROJECT_NAME} WIN32 ${ALL_SOURCES})
+else()
+    add_executable(${PROJECT_NAME} ${ALL_SOURCES})
+endif()
 
 #
 # linking libraries ==========================================================
