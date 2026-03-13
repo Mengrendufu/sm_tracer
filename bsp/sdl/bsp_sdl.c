@@ -109,11 +109,6 @@ static void do_render_frame(void) {
     }
     last_render = now;
 
-    bool lvgl_dirty   = BSP_lvgl_is_dirty();
-    bool msgbuf_dirty = BSP_msgbuf_is_dirty();
-
-    if (!lvgl_dirty && !msgbuf_dirty) return;
-
     SDL_SetRenderDrawColor(l_renderer, 0, 0, 0, 255);
     SDL_RenderClear(l_renderer);
     BSP_lvgl_render();

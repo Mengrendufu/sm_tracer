@@ -26,9 +26,14 @@ static bool l_lvgl_dirty = false;
 
 /*==========================================================================*/
 /* ...LVGL draw buffer. */
-#define DISP_BUF_SIZE (2650U * 1440U)  /* 2K */
+#define DISP_MAX_WIDTH  2650U
+#define DISP_MAX_HEIGHT 1440U
+#define DISP_BUF_SIZE   (DISP_MAX_WIDTH * DISP_MAX_HEIGHT)  /* 2K */
 static lv_color_t l_disp_buf_mem[DISP_BUF_SIZE];
 static lv_disp_draw_buf_t l_draw_buf_dsc;
+
+static int l_disp_max_w = (int)DISP_MAX_WIDTH;
+static int l_disp_max_h = (int)DISP_MAX_HEIGHT;
 
 /*==========================================================================*/
 /**
@@ -51,7 +56,17 @@ static void disp_flush_cb(
         rect.y = area->y1;
         rect.w = (area->x2 - area->x1 + 1);
         rect.h = (area->y2 - area->y1 + 1);
-        SDL_UpdateTexture(l_texture, &rect, color_p, rect.w * 4);
+
+        if (rect.x < 0) rect.x = 0;
+        if (rect.y < 0) rect.y = 0;
+        if (rect.x >= l_disp_max_w) rect.x = l_disp_max_w - 1;
+        if (rect.y >= l_disp_max_h) rect.y = l_disp_max_h - 1;
+        if (rect.x + rect.w > l_disp_max_w) rect.w = l_disp_max_w - rect.x;
+        if (rect.y + rect.h > l_disp_max_h) rect.h = l_disp_max_h - rect.y;
+
+        if (rect.w > 0 && rect.h > 0) {
+            SDL_UpdateTexture(l_texture, &rect, color_p, rect.w * 4);
+        }
     }
     l_lvgl_dirty = true;
     lv_disp_flush_ready(disp_drv);
@@ -118,7 +133,16 @@ void BSP_lvgl_render(void) {
 
 /*==========================================================================*/
 void BSP_lvgl_resize(int width, int height) {
-    (void)height;  /* LVGL panel is fixed-height; only width may change. */
+    (void)height;
+
+    int new_w = width;
+    int new_h = LVGL_WIND_HEIGHT;
+
+    if (new_w > l_disp_max_w) new_w = l_disp_max_w;
+    if (new_w < 1) new_w = 1;
+    if (new_h > l_disp_max_h) new_h = l_disp_max_h;
+    if (new_h < 1) new_h = 1;
+
     if (l_texture) {
         SDL_DestroyTexture(l_texture);
         l_texture = NULL;
@@ -128,14 +152,14 @@ void BSP_lvgl_resize(int width, int height) {
                     l_renderer_ref,
                     SDL_PIXELFORMAT_ARGB8888,
                     SDL_TEXTUREACCESS_STREAMING,
-                    width, LVGL_WIND_HEIGHT);
+                    new_w, new_h);
     Q_ENSURE(l_texture != NULL);
 
     lv_disp_t * disp = lv_disp_get_default();
     if (disp) {
-        disp->driver->hor_res = width;
-        disp->driver->ver_res = LVGL_WIND_HEIGHT;
+        disp->driver->hor_res = new_w;
+        disp->driver->ver_res = new_h;
         lv_disp_drv_update(disp, disp->driver);
     }
-    lv_refr_now(NULL);  /* Refresh now. */
+    lv_refr_now(NULL);
 }

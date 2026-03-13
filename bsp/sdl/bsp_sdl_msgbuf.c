@@ -181,15 +181,28 @@ static bool          l_cache_dirty  = true;  /* repaint needed */
 
 /*==========================================================================*/
 static void create_panel_cache(void) {
+    if (l_panel_w <= 0 || l_panel_h <= 0) {
+        if (l_panel_cache) {
+            SDL_DestroyTexture(l_panel_cache);
+            l_panel_cache = NULL;
+        }
+        return;
+    }
     if (l_panel_cache) {
         SDL_DestroyTexture(l_panel_cache);
         l_panel_cache = NULL;
     }
-    if (l_panel_w <= 0 || l_panel_h <= 0) return;
     l_panel_cache = SDL_CreateTexture(l_renderer,
                                       SDL_PIXELFORMAT_RGBA8888,
                                       SDL_TEXTUREACCESS_TARGET,
                                       l_panel_w, l_panel_h);
+    if (!l_panel_cache) {
+        SDL_LogError(SDL_LOG_CATEGORY_RENDER,
+            "Failed to create panel cache (%dx%d): %s",
+            l_panel_w, l_panel_h, SDL_GetError());
+        return;
+    }
+    SDL_SetTextureBlendMode(l_panel_cache, SDL_BLENDMODE_BLEND);
     l_cache_dirty = true;
 }
 
@@ -225,12 +238,33 @@ static void split_and_append_raw(const char *text) {
             l_lines[idx].len = copy_len;
             l_line_count++;
         } else {
-            int idx = l_line_head % MAX_LINES;
+            /* Buffer full — overwrite the oldest line (at l_line_head).
+             * Advance l_line_head so it points to the new oldest line.
+             * Adjust l_scroll_top so it stays aligned to the same content:
+             * logical index 0 now refers to a different physical slot. */
+            int idx = l_line_head;
             int copy_len = (len >= MAX_LINE_LEN) ? MAX_LINE_LEN - 1 : (int)len;
             memcpy(l_lines[idx].text, p, (size_t)copy_len);
             l_lines[idx].text[copy_len] = '\0';
             l_lines[idx].len = copy_len;
             l_line_head = (l_line_head + 1) % MAX_LINES;
+
+            /* Keep non-auto scroll position stable: the line the user was
+             * looking at just shifted down by one logical index because the
+             * oldest line was evicted.  Decrement scroll_top to compensate.
+             * Clamp to 0 — the user simply cannot scroll further back once
+             * the line they were on has been evicted. */
+            if (!l_auto_scroll) {
+                if (l_scroll_top > 0) {
+                    l_scroll_top--;
+                }
+            }
+
+            /* Invalidate selection when the ring wraps — the row indices
+             * recorded at selection time no longer refer to the same lines. */
+            if (l_sel_active) {
+                l_sel_active = false;
+            }
         }
 
         p += len;
@@ -240,6 +274,11 @@ static void split_and_append_raw(const char *text) {
 
 /*==========================================================================*/
 static void build_font_atlas(void) {
+    if (l_font_atlas) {
+        SDL_DestroyTexture(l_font_atlas);
+        l_font_atlas = NULL;
+    }
+
     int atlas_w = ATLAS_GLYPH_COUNT * l_atlas_glyph_w;
     int atlas_h = l_atlas_glyph_h;
 
@@ -247,7 +286,12 @@ static void build_font_atlas(void) {
                                      SDL_PIXELFORMAT_RGBA8888,
                                      SDL_TEXTUREACCESS_TARGET,
                                      atlas_w, atlas_h);
-    if (!l_font_atlas) return;
+    if (!l_font_atlas) {
+        SDL_LogError(SDL_LOG_CATEGORY_RENDER,
+            "Failed to create font atlas (%dx%d): %s",
+            atlas_w, atlas_h, SDL_GetError());
+        return;
+    }
 
     SDL_SetTextureBlendMode(l_font_atlas, SDL_BLENDMODE_BLEND);
     SDL_SetRenderTarget(l_renderer, l_font_atlas);
@@ -434,7 +478,13 @@ bool BSP_msgbuf_is_dirty(void) {
 /*==========================================================================*/
 void BSP_msgbuf_render(void) {
     if (!l_renderer) return;
-    if (!l_panel_cache) return;
+
+    if (!l_panel_cache || !l_font_atlas) {
+        if (!l_panel_cache) create_panel_cache();
+        if (!l_font_atlas) build_font_atlas();
+        if (!l_panel_cache || !l_font_atlas) return;
+        l_cache_dirty = true;
+    }
 
     if (l_cache_dirty) {
         SDL_SetRenderTarget(l_renderer, l_panel_cache);
@@ -451,35 +501,40 @@ void BSP_msgbuf_render(void) {
         int total    = buf_line_count();
         int max_cols = text_area_w() / CELL_ADV_W;
 
-        if (total == 0) {
-            draw_banner_to_cache();
-        } else {
-            for (int r = 0; r < rows; r++) {
-                int line_idx = l_scroll_top + r;
-                if (line_idx >= total) break;
-                Line *ln = buf_line_at(line_idx);
-                int py = PAD_Y + r * LINE_H;
-                for (int c = 0; c < ln->len && c < max_cols; c++) {
-                    int px = PAD_X + c * CELL_ADV_W;
-                    if (char_in_selection(line_idx, c)) {
-                        SDL_Rect sel_rect = { px, py, CELL_ADV_W, CELL_H };
-                        SDL_SetRenderDrawColor(l_renderer, 62, 68, 81, 255);
-                        SDL_RenderFillRect(l_renderer, &sel_rect);
-                        draw_glyph(px, py, (unsigned char)ln->text[c], 229, 229, 229);
-                    } else {
-                        draw_glyph(px, py, (unsigned char)ln->text[c], 171, 178, 191);
+        if (rows > 0 && max_cols > 0) {
+            if (total == 0) {
+                draw_banner_to_cache();
+            } else {
+                for (int r = 0; r < rows; r++) {
+                    int line_idx = l_scroll_top + r;
+                    if (line_idx < 0 || line_idx >= total) break;
+                    Line *ln = buf_line_at(line_idx);
+                    int py = PAD_Y + r * LINE_H;
+                    for (int c = 0; c < ln->len && c < max_cols; c++) {
+                        int px = PAD_X + c * CELL_ADV_W;
+                        if (char_in_selection(line_idx, c)) {
+                            SDL_Rect sel_rect = { px, py, CELL_ADV_W, CELL_H };
+                            SDL_SetRenderDrawColor(l_renderer, 62, 68, 81, 255);
+                            SDL_RenderFillRect(l_renderer, &sel_rect);
+                            draw_glyph(px, py, (unsigned char)ln->text[c], 229, 229, 229);
+                        } else {
+                            draw_glyph(px, py, (unsigned char)ln->text[c], 171, 178, 191);
+                        }
                     }
                 }
+                draw_scrollbar_to_cache();
             }
-            draw_scrollbar_to_cache();
         }
 
+        SDL_SetRenderDrawBlendMode(l_renderer, SDL_BLENDMODE_BLEND);
         SDL_SetRenderTarget(l_renderer, NULL);
         l_cache_dirty = false;
     }
 
-    SDL_Rect dst = { 0, l_panel_y, l_panel_w, l_panel_h };
-    SDL_RenderCopy(l_renderer, l_panel_cache, NULL, &dst);
+    if (l_panel_w > 0 && l_panel_h > 0) {
+        SDL_Rect dst = { 0, l_panel_y, l_panel_w, l_panel_h };
+        SDL_RenderCopy(l_renderer, l_panel_cache, NULL, &dst);
+    }
 }
 
 /*==========================================================================*/
@@ -622,9 +677,14 @@ void BSP_msgbuf_copy_selection(void) {
 
 /*==========================================================================*/
 void BSP_msgbuf_resize(int new_w, int new_h) {
-    l_panel_w = new_w;
-    l_panel_h = new_h - l_panel_y;
-    if (l_panel_h < 0) l_panel_h = 0;
+    int new_panel_w = new_w;
+    int new_panel_h = new_h - l_panel_y;
+    
+    if (new_panel_h < 50) new_panel_h = 50;
+    if (new_panel_w < 100) new_panel_w = 100;
+
+    l_panel_w = new_panel_w;
+    l_panel_h = new_panel_h;
 
     int total = buf_line_count();
     int rows  = visible_rows();
@@ -632,4 +692,14 @@ void BSP_msgbuf_resize(int new_w, int new_h) {
         l_scroll_top = total - rows;
     }
     create_panel_cache();
+    build_font_atlas();
+
+    if (!l_panel_cache || !l_font_atlas) {
+        SDL_LogWarn(SDL_LOG_CATEGORY_RENDER,
+            "Resize failed: cache=%p atlas=%p (w=%d h=%d)",
+            (void*)l_panel_cache, (void*)l_font_atlas,
+            l_panel_w, l_panel_h);
+    }
+
+    l_cache_dirty = true;
 }
