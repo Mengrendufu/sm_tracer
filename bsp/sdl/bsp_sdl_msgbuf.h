@@ -100,4 +100,13 @@ void BSP_msgbuf_copy_selection(void);
  */
 void BSP_msgbuf_resize(int new_w, int new_h);
 
+/*==========================================================================*/
+/**
+ * @brief Handle SDL render targets reset event.
+ *        Rebuilds font atlas and panel cache, marks cache dirty for redraw.
+ *        Call this when SDL_RENDER_TARGETS_RESET or SDL_RENDER_DEVICE_RESET
+ *        events are received.
+ */
+void BSP_msgbuf_handle_render_reset(void);
+
 #endif  /* BSP_SDL_MSGBUF_H_ */

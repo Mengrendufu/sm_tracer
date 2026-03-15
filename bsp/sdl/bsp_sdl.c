@@ -14,6 +14,7 @@
 #include "qpc.h"
 #include "bsp.h"
 #include "application.h"
+#include "bsp_sdl_msgbuf.h"
 
 #ifdef _WIN32
 #include "SDL_syswm.h"
@@ -140,8 +141,19 @@ static void SDL_WndProc(SDL_Event *e) {
                     BSP_msgbuf_resize(e->window.data1, e->window.data2);
                     break;
                 }
+                case SDL_WINDOWEVENT_FOCUS_GAINED:
+                case SDL_WINDOWEVENT_RESTORED: {
+                    BSP_msgbuf_handle_render_reset();
+                    break;
+                }
                 default: break;
             }
+            break;
+        }
+
+        case SDL_RENDER_TARGETS_RESET:
+        case SDL_RENDER_DEVICE_RESET: {
+            BSP_msgbuf_handle_render_reset();
             break;
         }
 
@@ -287,6 +299,28 @@ int main(int argc, char *argv[]) {
     SDL_Quit();
 
     return 0;
+}
+
+/*==========================================================================*/
+#if !SDL_VERSION_ATLEAST(2, 0, 16)
+#error "SDL version 2.0.16 or newer is required."
+#endif
+
+/*..........................................................................*/
+bool BSP_windowIsAlwaysOnTop(void) {
+    bool on_top = false;
+    if (l_window != NULL) {
+        uint32_t const flags = SDL_GetWindowFlags(l_window);
+        on_top = (flags & SDL_WINDOW_ALWAYS_ON_TOP) != 0U;
+    }
+    return on_top;
+}
+
+/*..........................................................................*/
+void BSP_windowSetAlwaysOnTop(bool on_top) {
+    if (l_window != NULL) {
+        SDL_SetWindowAlwaysOnTop(l_window, (SDL_bool)on_top);
+    }
 }
 
 /*==========================================================================*/

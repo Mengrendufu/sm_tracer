@@ -8,6 +8,8 @@
  * See http://www.wtfpl.net/ for more details.
  ****************************************************************************/
 /*==========================================================================*/
+#include "core/lv_obj_pos.h"
+#include "extra/layouts/flex/lv_flex.h"
 #include "qpc.h"
 #include "bsp.h"
 #include "application.h"
@@ -22,6 +24,7 @@ LV_FONT_DECLARE(hack_nerd_font_regular);
 /*==========================================================================*/
 /* LVGL main screen creating handler. */
 static void GUI_createMainScreen(void);
+static void GUI_syncTopmostButtonState(void);
 
 /*==========================================================================*/
 /* ...GUI main screen's LVGL objects. */
@@ -35,6 +38,7 @@ static lv_obj_t *GUI_DdBox_dataBits = NULL;
 static lv_obj_t *GUI_DdBox_stopBits = NULL;
 static lv_obj_t *GUI_DdBox_parity   = NULL;
 static lv_obj_t *GUI_DdBox_flowCtrl = NULL;
+static lv_obj_t *GUI_Btn_topmost    = NULL;
 /*..........................................................................*/
 /* ...JSON file directory path. */
 #define MAX_CFG_PATH_DEPTH 3
@@ -176,7 +180,23 @@ static void GUIEvtCb_flowCtrl(lv_event_t *e) {
     }
 }
 /*..........................................................................*/
-/* ...GUI_DdBox_jsonFiles. */
+/* GUI_Btn_topmost. */
+static void GUIEvtCb_Btn_topmost(lv_event_t *e) {
+    (void)e;
+    bool const curr = BSP_windowIsAlwaysOnTop();
+    BSP_windowSetAlwaysOnTop(!curr);
+    GUI_syncTopmostButtonState();
+}
+static void GUI_syncTopmostButtonState(void) {
+    if (GUI_Btn_topmost != (lv_obj_t *)0) {
+        if (BSP_windowIsAlwaysOnTop()) {
+            lv_obj_add_state(GUI_Btn_topmost, LV_STATE_CHECKED);
+        } else {
+            lv_obj_clear_state(GUI_Btn_topmost, LV_STATE_CHECKED);
+        }
+    }
+}
+/*..........................................................................*/
 static void GUI_postJsonFilePath(void) {
     char currFileName[256];  /* A file name's length exceeds 256 is crazy. */
     char *selectedJsonFile = malloc(256);
@@ -422,6 +442,29 @@ static void GUI_createMainScreen(void) {
     lv_obj_set_width(GUI_DdBox_flowCtrl, 120);
     lv_obj_add_event_cb(
         GUI_DdBox_flowCtrl, GUIEvtCb_flowCtrl, LV_EVENT_ALL, NULL);
+
+    /* Spacer to push next widgets to the right. */
+    lv_obj_t *spacer = lv_obj_create(root_comCtrlPanel);
+    lv_obj_remove_style_all(spacer);
+    lv_obj_set_height(spacer, 0);
+    lv_obj_set_flex_grow(spacer, 1);
+    lv_obj_set_style_bg_opa(spacer, 0, 0);
+    lv_obj_set_style_border_width(spacer, 0, 0);
+
+    /* Topmost toggle button. */
+    GUI_Btn_topmost = lv_btn_create(root_comCtrlPanel);
+    lv_obj_add_flag(GUI_Btn_topmost, LV_OBJ_FLAG_CHECKABLE);
+    lv_obj_set_size(GUI_Btn_topmost, 64, 36);
+    lv_obj_add_event_cb(
+        GUI_Btn_topmost, GUIEvtCb_Btn_topmost, LV_EVENT_CLICKED, NULL);
+    lv_obj_set_style_bg_color(
+        GUI_Btn_topmost, lv_palette_main(LV_PALETTE_GREY), LV_STATE_DEFAULT);
+    lv_obj_set_style_bg_color(
+        GUI_Btn_topmost, lv_palette_main(LV_PALETTE_TEAL), LV_STATE_CHECKED);
+
+    lv_obj_t *GUI_Btn_topmost_label = lv_label_create(GUI_Btn_topmost);
+    lv_label_set_text(GUI_Btn_topmost_label, "top");
+    lv_obj_center(GUI_Btn_topmost_label);
 
     /* ...Sub container of root container. */
     lv_obj_t *root_subContainer = lv_obj_create(root);

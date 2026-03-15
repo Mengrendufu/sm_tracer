@@ -676,6 +676,21 @@ void BSP_msgbuf_copy_selection(void) {
 }
 
 /*==========================================================================*/
+void BSP_msgbuf_handle_render_reset(void) {
+    if (l_font_atlas) {
+        SDL_DestroyTexture(l_font_atlas);
+        l_font_atlas = NULL;
+    }
+    if (l_panel_cache) {
+        SDL_DestroyTexture(l_panel_cache);
+        l_panel_cache = NULL;
+    }
+    build_font_atlas();
+    create_panel_cache();
+    l_cache_dirty = true;
+}
+
+/*==========================================================================*/
 void BSP_msgbuf_resize(int new_w, int new_h) {
     int new_panel_w = new_w;
     int new_panel_h = new_h - l_panel_y;

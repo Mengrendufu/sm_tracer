@@ -13,6 +13,22 @@
 
 /*==========================================================================*/
 #define BSP_TICKS_PER_SEC  100U  /* System tick frequency. */
+#include <stdbool.h>
+
+/*==========================================================================*/
+/**
+ * @brief Get the window always-on-top status.
+ *
+ * @return bool
+ */
+bool BSP_windowIsAlwaysOnTop(void);
+/*..........................................................................*/
+/**
+ * @brief Set the window always-on-top status.
+ *
+ * @param on_top
+ */
+void BSP_windowSetAlwaysOnTop(bool on_top);
 
 /*==========================================================================*/
 /**
