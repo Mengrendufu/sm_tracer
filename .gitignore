@@ -72,11 +72,5 @@ build/
 3rd_party/sdl2-build/
 3rd_party/libserialport-build/
 
-# Windows Zone.Identifier metadata files =====================================
-*:Zone.Identifier
-
 # ai_agents ==================================================================
-.opencode
-.ai_agents
-.sisyphus
-.ai_context/
+.__ai_agent/
